@@ -150,3 +150,7 @@ reportConstantRedefinition = true
 reportIncompatibleMethodOverride = true
 reportIncompatibleVariableOverride = true
 reportInconsistentConstructor = true
+
+[tool.bandit]
+exclude_dirs = [".venv", "build", "dist", ".eggs", "*.egg-info"]
+skips = ["B101"] # Skip assert use check as it is commonly used in tests and not a security issue in this context
