@@ -53,3 +53,33 @@ ln -s /path/to/repo/src/tachograph_wizard ~/.config/GIMP/3.0/plug-ins/tachograph
   - **GIMP 3.0**（または互換性のあるリリース候補版/ベータ版）がインストールされていることを確認してください。このプラグインはGIMP 3で利用可能なGObject Introspectionを使用します。
   - `plug-ins`フォルダ内の`tachograph_wizard`フォルダに`plugin.py`が含まれていることを確認してください。
   - Linux/macOSでは、`plugin.py`に実行権限が付与されていることを確認してください（`chmod +x plugin.py`）。
+
+- **"インタープリター 'python3' は無効です" というエラーが出る場合 (Windows)**
+  GIMPがPythonを見つけられていません。`C:\Program Files\GIMP 3\lib\gimp\3.0\interpreters\pygimp.interp` をテキストエディタ（管理者権限）で開き、以下のようにPythonのフルパスを指定してください。
+
+  **変更前:**
+  ```ini
+  python=pythonw.exe
+  python3=pythonw.exe
+  ```
+
+  **変更後 (例: Pythonが標準的な場所にインストールされている場合):**
+  ```ini
+  python=C:\Users\あなたのユーザー名\AppData\Local\Programs\Python\Python312\pythonw.exe
+  python3=C:\Users\あなたのユーザー名\AppData\Local\Programs\Python\Python312\pythonw.exe
+  ```
+  ※ `pythonw.exe` のパスは、お使いの環境に合わせて書き換えてください（`where pythonw` コマンドで確認できます）。
+
+  **uvを使用している場合:**
+  uvで管理されているPythonを使用する場合、バージョンリストからパスを確認できます。
+  ```powershell
+  uv python list --only-installed
+  ```
+  出力例:
+  `cpython-3.12.11-windows-x86_64-none    C:\Users\User\AppData\Roaming\uv\python\cpython-3.12.11-windows-x86_64-none\python.exe`
+
+  このパスの `python.exe` を `pythonw.exe` に置き換えて設定ファイルに記述してください。
+  ```ini
+  python=C:\Users\User\AppData\Roaming\uv\python\cpython-3.12.11-windows-x86_64-none\pythonw.exe
+  python3=C:\Users\User\AppData\Roaming\uv\python\cpython-3.12.11-windows-x86_64-none\pythonw.exe
+  ```
