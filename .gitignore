@@ -254,3 +254,9 @@ PATCHES/
 Thumbs.db
 ehthumbs.db
 logs/
+
+# Auto-generated entries from templates
+*.py,cover
+*.py[cod]
+.pyrightcache/
+.venv/
