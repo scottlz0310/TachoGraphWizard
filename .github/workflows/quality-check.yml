@@ -100,16 +100,27 @@ jobs:
 
   pre-commit:
     runs-on: ubuntu-latest
-    if: hashFiles('.pre-commit-config.yaml') != ''
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check for pre-commit config
+        id: check_precommit
+        run: |
+          if [ ! -f ".pre-commit-config.yaml" ]; then
+            echo "No .pre-commit-config.yaml found, skipping pre-commit checks"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install uv
+        if: steps.check_precommit.outputs.skip != 'true'
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
 
       - name: Set up Python
+        if: steps.check_precommit.outputs.skip != 'true'
         run: |
           # Detect Python version from pyproject.toml
           if [ -f "pyproject.toml" ]; then
@@ -122,16 +133,19 @@ jobs:
           uv python pin $PYTHON_VERSION
 
       - name: Install pre-commit
+        if: steps.check_precommit.outputs.skip != 'true'
         run: |
           uv tool install pre-commit
 
       - name: Cache pre-commit hooks
+        if: steps.check_precommit.outputs.skip != 'true'
         uses: actions/cache@v5
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
       - name: Run pre-commit hooks
+        if: steps.check_precommit.outputs.skip != 'true'
         run: |
           pre-commit run --all-files
 
