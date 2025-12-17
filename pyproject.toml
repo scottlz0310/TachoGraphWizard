@@ -37,6 +37,8 @@ packages = ["src/tachograph_wizard"]
 [tool.ruff]
 line-length = 120
 target-version = "py314"
+
+[tool.ruff.lint]
 select = [
     "E",
     "F",
@@ -154,3 +156,8 @@ reportInconsistentConstructor = true
 [tool.bandit]
 exclude_dirs = [".venv", "build", "dist", ".eggs", "*.egg-info"]
 skips = ["B101"] # Skip assert use check as it is commonly used in tests and not a security issue in this context
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]
