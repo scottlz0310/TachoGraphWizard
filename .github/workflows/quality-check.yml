@@ -100,6 +100,7 @@ jobs:
 
   pre-commit:
     runs-on: ubuntu-latest
+    if: hashFiles('.pre-commit-config.yaml') != ''
     steps:
       - uses: actions/checkout@v6
 
@@ -161,11 +162,11 @@ jobs:
             if uv run python -c "import tomllib; f=open('pyproject.toml','rb'); data=tomllib.load(f); exit(0 if 'dependency-groups' in data and 'docs' in data['dependency-groups'] else 1)" 2>/dev/null; then
               uv sync --group docs
             else
-              # Fallback to basic sphinx installation
-              uv pip install --system sphinx sphinx-rtd-theme
+              # Fallback to basic sphinx installation without --system flag
+              uv pip install sphinx sphinx-rtd-theme
             fi
           else
-            uv pip install --system sphinx sphinx-rtd-theme
+            uv pip install sphinx sphinx-rtd-theme
           fi
 
       - name: Build documentation
