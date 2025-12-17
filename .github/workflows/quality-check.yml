@@ -43,12 +43,12 @@ jobs:
             source .venv/bin/activate
             uv pip install -r requirements.txt
             # Install common development tools
-            uv pip install ruff mypy pytest pytest-cov
+            uv pip install ruff basedpyright pytest pytest-cov
           else
             # Install basic tools for projects without dependency files
             uv venv
             source .venv/bin/activate
-            uv pip install ruff mypy pytest pytest-cov
+            uv pip install ruff basedpyright pytest pytest-cov
           fi
 
       - name: Lint with Ruff
@@ -64,10 +64,10 @@ jobs:
           # Ruff will use pyproject.toml configuration automatically
           uv run ruff format --check .
 
-      - name: Type check with MyPy
+      - name: Type check with Basedpyright
         run: |
-          # MyPy will use pyproject.toml configuration automatically
-          uv run mypy src --show-error-codes --show-error-context
+          # Basedpyright will use pyproject.toml configuration automatically
+          uv run basedpyright
 
       - name: Test with pytest
         run: |
