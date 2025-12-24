@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """TachoGraphWizard - GIMP 3 Plugin Entry Point.
 
 Main plugin class that registers procedures and handles GIMP plugin lifecycle.
