@@ -411,7 +411,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bandit", specifier = ">=1.8.0" },
+    { name = "bandit", specifier = ">=1.8.6" },
     { name = "basedpyright", specifier = ">=1.36.2" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.2" },
