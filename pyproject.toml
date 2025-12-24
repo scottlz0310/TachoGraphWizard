@@ -8,20 +8,7 @@ authors = [
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "basedpyright>=1.36.2",
-    "pytest>=9.0.2",
-    "ruff>=0.14.10",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-mock>=3.15.1",
-    "ruff>=0.14.10",
-    "basedpyright>=1.36.2",
-]
+dependencies = []
 
 [build-system]
 requires = ["hatchling"]
@@ -162,9 +149,19 @@ reportInconsistentConstructor = true
 
 [tool.bandit]
 exclude_dirs = [".venv", "build", "dist", ".eggs", "*.egg-info"]
-skips = ["B101"] # Skip assert use check as it is commonly used in tests and not a security issue in this context
+skips = [
+    "B101",  # assert (OK in tests)
+    "B110",  # try-except-pass (needed for GIMP API compatibility fallbacks)
+    "B112",  # try-except-continue (needed for GIMP API compatibility fallbacks)
+]
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.36.2",
+    "bandit>=1.8.0",
     "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.14.10",
 ]
