@@ -212,6 +212,13 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
             self.split_images = ImageSplitter.split_by_guides(self.image)
 
+            # Display each split image in GIMP
+            for img in self.split_images:
+                Gimp.Display.new(img)
+
+            # Flush displays to show them immediately
+            Gimp.displays_flush()
+
             count = len(self.split_images)
             self.status_label.set_text(f"Split into {count} images")
 
@@ -232,13 +239,17 @@ class TachographSimpleDialog(GimpUi.Dialog):
             threshold = self.threshold_adjustment.get_value()
 
             for img in self.split_images:
-                # Get active layer
-                layer = img.get_active_layer()
-                if layer:
+                # Get layers - GIMP 3 uses get_layers() instead of get_active_layer()
+                layers = img.get_layers()
+                if layers:
+                    layer = layers[0]
                     BackgroundRemover.process_background(
                         layer,
                         threshold=threshold,
+                        apply_despeckle=False,  # Disabled until GIMP 3 API is figured out
                     )
+
+            Gimp.displays_flush()
 
             self.status_label.set_text(
                 f"Removed background from {len(self.split_images)} images",

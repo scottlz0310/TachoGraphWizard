@@ -117,14 +117,27 @@ def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log
         except Exception:
             pass
 
-        # Drawable
+        # Drawable - try both singular and plural forms
         try:
             if isinstance(v, Gimp.Drawable):
-                for cand in ("drawable",):
-                    if (not prop_names) or (cand in prop_names):
-                        if _set_config_property(config, cand, v):
-                            _log(f"pdb_config set {cand}=<Drawable>")
-                            break
+                # First try singular "drawable"
+                if "drawable" in prop_names:
+                    if _set_config_property(config, "drawable", v):
+                        _log("pdb_config set drawable=<Drawable>")
+                        continue
+                # Then try "drawables" as a list
+                if "drawables" in prop_names:
+                    # Try setting as Python list first
+                    if _set_config_property(config, "drawables", [v]):
+                        _log("pdb_config set drawables=[Drawable]")
+                        continue
+                    # Fallback: just set the single drawable directly
+                    try:
+                        if _set_config_property(config, "drawables", v):
+                            _log("pdb_config set drawables=<Drawable> (single)")
+                            continue
+                    except Exception as arr_e:
+                        _log(f"pdb_config drawables fallback failed: {arr_e}")
                 continue
         except Exception:
             pass

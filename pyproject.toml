@@ -96,6 +96,7 @@ ignore = [
     "PLR0912", # Too many branches (GIMP compatibility code inherently complex)
     "PLR0915", # Too many statements (GIMP compatibility code inherently complex)
     "SIM102",  # Use single if statement (readability preference)
+    "EXE001",  # Shebang present but not executable (needed for GIMP plugin on Windows)
 ]
 fixable = ["ALL"]
 unfixable = []
