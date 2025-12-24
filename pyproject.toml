@@ -159,7 +159,7 @@ skips = [
 [dependency-groups]
 dev = [
     "basedpyright>=1.36.2",
-    "bandit>=1.8.0",
+    "bandit>=1.8.6",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
