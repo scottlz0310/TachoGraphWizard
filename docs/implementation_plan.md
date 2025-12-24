@@ -14,7 +14,7 @@ GIMP 3向けタコグラフチャート画像処理ウィザードプラグイ�
 ```
 TachoGraphWizard/
 ├── src/tachograph_wizard/          # メインパッケージ
-│   ├── plugin.py                   # プラグインエントリーポイント
+│   ├── tachograph_wizard.py        # プラグインエントリーポイント
 │   ├── procedures/                 # プロシージャ実装
 │   │   ├── wizard_procedure.py     # メインウィザードプロシージャ
 │   │   └── batch_procedure.py      # (Phase 5) バッチ処理
@@ -78,7 +78,7 @@ TachoGraphWizard/
 - PNG保存（アルファチャンネル保持）
 
 **実装ファイル**:
-1. `src/tachograph_wizard/plugin.py` - Gimp.PlugInクラス、プラグイン登録
+1. `src/tachograph_wizard/tachograph_wizard.py` - Gimp.PlugInクラス、プラグイン登録
 2. `src/tachograph_wizard/procedures/wizard_procedure.py` - メインプロシージャ
 3. `src/tachograph_wizard/core/image_splitter.py` - ガイド分割実装
 4. `src/tachograph_wizard/core/background_remover.py` - Color to Alpha呼び出し
@@ -276,7 +276,7 @@ def mock_gimp():
 
 ### 最優先で実装するファイル（TOP 5）
 
-1. **`src/tachograph_wizard/plugin.py`**
+1. **`src/tachograph_wizard/tachograph_wizard.py`**
    - プラグインのエントリーポイント
    - `Gimp.PlugIn`クラスの実装
    - プロシージャの登録
@@ -305,7 +305,7 @@ def mock_gimp():
 
 1. ✅ ディレクトリ構造作成
 2. ✅ `__init__.py`ファイル作成
-3. ✅ `plugin.py`実装（プラグイン登録）
+3. ✅ `tachograph_wizard.py`実装（プラグイン登録）
 4. ⬜ GIMP 3でプラグイン読み込み確認
 5. ✅ コアモジュール実装（splitter, remover, exporter）
 6. ✅ 型アノテーション追加（全ファイル）

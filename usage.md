@@ -16,7 +16,7 @@ GIMP 3のユーザープラグインディレクトリを探します。一般�
 
 ### 2. プラグインのインストール
 GIMPが期待するディレクトリ構造に合わせるため、プラグインをインストールする必要があります：
-`plug-ins/tachograph_wizard/__init__.py` および `plug-ins/tachograph_wizard/plugin.py`。
+`plug-ins/tachograph_wizard/__init__.py` および `plug-ins/tachograph_wizard/tachograph_wizard.py`。
 
 #### オプションA: コピー（最も簡単）
 1. このリポジトリから `src/tachograph_wizard` ディレクトリをコピーします。
@@ -29,6 +29,10 @@ GIMPが期待するディレクトリ構造に合わせるため、プラグイ�
 ```powershell
 New-Item -ItemType SymbolicLink -Path "$env:APPDATA\GIMP\3.0\plug-ins\tachograph_wizard" -Target "C:\path\to\repo\src\tachograph_wizard"
 ```
+
+※ GIMP 3では `plug-ins` 直下の `.py` はスキップされ、**サブディレクトリ配下**にあるプラグインだけが対象になります（`plug-ins must be installed in subdirectories.`）。
+
+また、エントリポイントのファイル名は **ディレクトリ名と同じ**にする必要があります（例: `plug-ins/tachograph_wizard/tachograph_wizard.py`）。
 
 **Linux/macOS:**
 ```bash
@@ -51,8 +55,10 @@ ln -s /path/to/repo/src/tachograph_wizard ~/.config/GIMP/3.0/plug-ins/tachograph
 
 - **プラグインが表示されない場合**
   - **GIMP 3.0**（または互換性のあるリリース候補版/ベータ版）がインストールされていることを確認してください。このプラグインはGIMP 3で利用可能なGObject Introspectionを使用します。
-  - `plug-ins`フォルダ内の`tachograph_wizard`フォルダに`plugin.py`が含まれていることを確認してください。
-  - Linux/macOSでは、`plugin.py`に実行権限が付与されていることを確認してください（`chmod +x plugin.py`）。
+   - `plug-ins`フォルダ内の`tachograph_wizard`フォルダに`tachograph_wizard.py`が含まれていることを確認してください（ディレクトリ名と同じファイル名が必要です）。
+   - `--verbose` 起動ログに `...\GIMP\3.0\plug-ins\tachograph_wizard...` が出ない場合、`%APPDATA%\GIMP\3.0\pluginrc` が古い状態をキャッシュしていることがあります。GIMPを終了してから `pluginrc` を一度リネーム（例: `pluginrc.bak`）して再起動し、再スキャンされるか確認してください。
+   - メニューを実行しても反応がない/原因が分からない場合、デバッグログ `%TEMP%\tachograph_wizard.log` を確認してください（`do_query_procedures` / `_run_wizard invoked` / `error:` などが出ます）。
+   - Linux/macOSでは、`tachograph_wizard.py`に実行権限が付与されていることを確認してください（`chmod +x tachograph_wizard.py`）。
 
 - **"インタープリター 'python3' は無効です" というエラーが出る場合 (Windows)**
   GIMPがPythonを見つけられていません。`C:\Program Files\GIMP 3\lib\gimp\3.0\interpreters\pygimp.interp` をテキストエディタ（管理者権限）で開き、以下のようにPythonのフルパスを指定してください。

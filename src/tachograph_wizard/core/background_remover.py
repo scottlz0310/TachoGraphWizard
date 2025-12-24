@@ -13,6 +13,8 @@ gi.require_version("Gegl", "0.4")
 
 from gi.repository import Gegl, Gimp
 
+from tachograph_wizard.core.pdb_runner import run_pdb_procedure
+
 
 class BackgroundRemover:
     """Remove background and make it transparent."""
@@ -45,15 +47,12 @@ class BackgroundRemover:
         # Create and configure the color-to-alpha filter
         # Note: GIMP 3 uses GEGL filters via procedures
         try:
-            # Get PDB and run the color-to-alpha procedure
-            pdb = Gimp.get_pdb()
-
             # Convert Gegl.Color to RGB values for the procedure
             # Note: This is a simplified approach; actual implementation
             # may need to handle color format conversion
             from gi.repository import GObject
 
-            result = pdb.run_procedure(
+            result = run_pdb_procedure(
                 "gegl:color-to-alpha",
                 [
                     GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
@@ -87,9 +86,7 @@ class BackgroundRemover:
         try:
             from gi.repository import GObject
 
-            pdb = Gimp.get_pdb()
-
-            result = pdb.run_procedure(
+            result = run_pdb_procedure(
                 "gegl:median-blur",
                 [
                     GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),

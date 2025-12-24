@@ -7,7 +7,11 @@ Main plugin class that registers procedures and handles GIMP plugin lifecycle.
 from __future__ import annotations
 
 import sys
+import traceback
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING
+from datetime import datetime
 
 import gi
 
@@ -15,6 +19,33 @@ gi.require_version("Gimp", "3.0")
 gi.require_version("GimpUi", "3.0")
 
 from gi.repository import Gimp, GimpUi, GLib
+
+
+def _log_path() -> Path:
+    base = os.environ.get("TEMP") or os.environ.get("TMP") or os.environ.get("LOCALAPPDATA") or str(Path.home())
+    return Path(base) / "tachograph_wizard.log"
+
+
+def _debug_log(message: str) -> None:
+    try:
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        line = f"[{timestamp}] {message}"
+        with _log_path().open("a", encoding="utf-8") as fp:
+            fp.write(line + "\n")
+    except Exception:
+        # Never crash the plugin due to logging.
+        pass
+
+
+_debug_log(f"module imported from: {__file__}")
+
+
+# Ensure the package is importable when GIMP executes this file from within a
+# subdirectory under the plug-ins folder.
+_plugin_dir = Path(__file__).resolve().parent
+_parent_dir = _plugin_dir.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -33,6 +64,7 @@ class TachographWizard(Gimp.PlugIn):
         Returns:
             List containing the procedure name(s) this plugin provides.
         """
+        _debug_log("do_query_procedures")
         return ["tachograph-wizard"]
 
     def do_create_procedure(self, name: str) -> Gimp.Procedure | None:
@@ -44,6 +76,7 @@ class TachographWizard(Gimp.PlugIn):
         Returns:
             The created procedure, or None if the name is not recognized.
         """
+        _debug_log(f"do_create_procedure name={name}")
         if name == "tachograph-wizard":
             procedure = Gimp.ImageProcedure.new(
                 self,
@@ -81,10 +114,7 @@ class TachographWizard(Gimp.PlugIn):
         procedure: Gimp.Procedure,
         run_mode: Gimp.RunMode,
         image: Gimp.Image,
-        n_drawables: int,
-        drawables: Sequence[Gimp.Drawable],
-        config: Gimp.ProcedureConfig,
-        run_data: object,
+        *args: object,
     ) -> Gimp.ValueArray:
         """Execute the wizard procedure.
 
@@ -100,21 +130,76 @@ class TachographWizard(Gimp.PlugIn):
         Returns:
             ValueArray containing the procedure's return values.
         """
-        # Import here to avoid circular imports
-        from tachograph_wizard.procedures.wizard_procedure import run_wizard_dialog
 
-        # Initialize GimpUi for interactive mode
+        # Lightweight logging to make invocation/debugging visible on Windows.
+        # GIMP may fail silently unless we emit a message or write to stderr.
+        _debug_log(f"_run_wizard invoked (run_mode={run_mode}, args_len={len(args)})")
+
+        # Normalize callback args.
+        # Different GIMP 3 builds/bindings may pass either:
+        #   (drawables, config, run_data)
+        # or:
+        #   (n_drawables, drawables, config, run_data)
+        drawables: Sequence[Gimp.Drawable] = []
+        config: Gimp.ProcedureConfig | None = None
+
+        if args:
+            if isinstance(args[0], int):
+                # (n_drawables, drawables, config, run_data)
+                if len(args) >= 2:
+                    drawables = args[1]  # type: ignore[assignment]
+                if len(args) >= 3:
+                    config = args[2]  # type: ignore[assignment]
+            else:
+                # (drawables, config, run_data)
+                drawables = args[0]  # type: ignore[assignment]
+                if len(args) >= 2:
+                    config = args[1]  # type: ignore[assignment]
+
+        try:
+            _debug_log(
+                f"args_types={[type(a).__name__ for a in args]} drawables_len={len(drawables) if hasattr(drawables, '__len__') else 'na'}"
+            )
+        except Exception:
+            pass
+        try:
+            Gimp.message("Tachograph Wizard: invoked")
+        except Exception as exc:
+            _debug_log(f"Gimp.message failed: {exc!s}")
+
+        # Initialize GimpUi for interactive mode BEFORE importing any Gtk/GimpUi UI modules.
         if run_mode == Gimp.RunMode.INTERACTIVE:
-            GimpUi.init("tachograph-wizard")
+            try:
+                GimpUi.init("tachograph-wizard")
+                _debug_log("GimpUi.init ok")
+            except Exception as exc:
+                _debug_log(f"GimpUi.init failed: {exc!s}")
+
+        # Import here to avoid circular imports (and after UI init).
+        from tachograph_wizard.procedures.wizard_procedure import run_wizard_dialog
 
         # Run the wizard
         try:
-            drawable = drawables[0] if n_drawables > 0 else None
+            drawable = drawables[0] if drawables else None
+            _debug_log(f"running dialog (drawable_present={drawable is not None})")
             success = run_wizard_dialog(image, drawable)
 
             # Return success or cancel status
             status = Gimp.PDBStatusType.SUCCESS if success else Gimp.PDBStatusType.CANCEL
         except Exception as e:
+            tb = traceback.format_exc()
+            _debug_log(f"error: {e!s}")
+            try:
+                sys.stderr.write(f"[tachograph_wizard] traceback:\n{tb}\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+            try:
+                Gimp.message(f"Tachograph Wizard error: {e!s}\n\n{tb}")
+            except Exception as exc:
+                _debug_log(f"Gimp.message(error) failed: {exc!s}")
+
             # Return error status
             error_message = f"Error running wizard: {e!s}"
             return procedure.new_return_values(

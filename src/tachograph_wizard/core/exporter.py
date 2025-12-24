@@ -16,6 +16,8 @@ gi.require_version("Gio", "2.0")
 
 from gi.repository import Gimp, Gio, GObject
 
+from tachograph_wizard.core.pdb_runner import run_pdb_procedure
+
 
 class Exporter:
     """Export processed images to PNG with alpha channel."""
@@ -64,12 +66,10 @@ class Exporter:
 
         # Save as PNG using GIMP 3 file save procedure
         try:
-            pdb = Gimp.get_pdb()
-
             # Get all drawables to export
             num_drawables, drawables = image.get_selected_drawables()
 
-            result = pdb.run_procedure(
+            result = run_pdb_procedure(
                 "file-png-save",
                 [
                     GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
