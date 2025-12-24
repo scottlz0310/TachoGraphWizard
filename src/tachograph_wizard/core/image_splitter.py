@@ -6,13 +6,15 @@ tachograph charts into individual images.
 
 from __future__ import annotations
 
-import os
 import datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import gi
 
 gi.require_version("Gimp", "3.0")
+
+import os
 
 from gi.repository import Gimp, GObject
 
@@ -53,43 +55,44 @@ class ImageSplitter:
                 base = os.environ.get("TEMP") or os.environ.get("TMP") or os.environ.get("LOCALAPPDATA")
                 if not base:
                     return
-                log_path = os.path.join(base, "tachograph_wizard.log")
-                ts = datetime.datetime.now().isoformat(timespec="seconds")
-                with open(log_path, "a", encoding="utf-8") as fp:
-                    fp.write(f"[{ts}] image_splitter: {message}\n")
+                log_path = Path(base) / "tachograph_wizard.log"
+                ts = datetime.datetime.now(tz=datetime.UTC).isoformat(timespec="seconds")
+                log_path.open("a", encoding="utf-8").write(f"[{ts}] image_splitter: {message}\n")
             except Exception:
                 return
 
         def _safe_attr(obj: object, name: str) -> str:
             try:
-                value = getattr(obj, name)  # noqa: B009
+                value = getattr(obj, name)
                 if callable(value):
                     value = value()
                 return str(value)
             except Exception:
                 return "?"
 
-        def _image_key(img_or_id: object) -> tuple[str, object]:
+        def _image_key(img_or_id: Any) -> tuple[str, object]:
             """Return a hashable identity for either a Gimp.Image or an image-id."""
             try:
                 if isinstance(img_or_id, int):
-                    return ("id", int(img_or_id))
+                    return ("id", img_or_id)
                 get_id = getattr(img_or_id, "get_id", None)
                 if callable(get_id):
-                    return ("id", int(get_id()))
+                    result = get_id()
+                    return ("id", int(result) if isinstance(result, (int, float, str)) else result)
             except Exception:
                 pass
 
             return ("repr", repr(img_or_id))
 
-        def _try_list_images() -> list[object] | None:
+        def _try_list_images() -> list[Any] | None:
             """Best-effort image enumeration across GIMP 3 binding variants."""
             # In many GIMP 3 Python builds, Gimp.get_images() exists but Gimp.list_images() does not.
             for candidate in ("get_images", "list_images", "images"):
                 fn = getattr(Gimp, candidate, None)
                 if callable(fn):
                     try:
-                        images = list(fn())
+                        result: Any = fn()
+                        images: list[Any] = list(result) if hasattr(result, "__iter__") else []
                         _debug_log(f"images_enum via Gimp.{candidate}() count={len(images)}")
                         return images
                     except Exception as e:
@@ -98,7 +101,7 @@ class ImageSplitter:
             _debug_log("images_enum: no supported Gimp.*images* API found")
             return None
 
-        def _iter_values(value: object, max_depth: int = 3, _depth: int = 0):
+        def _iter_values(value: Any, max_depth: int = 3, _depth: int = 0):
             """Walk nested result containers (ValueArray / lists) to find images."""
             yield value
             if _depth >= max_depth:
@@ -106,12 +109,13 @@ class ImageSplitter:
 
             try:
                 # Gimp.ValueArray / GLib containers often expose length() + index(i)
-                length = getattr(value, "length", None)
-                index = getattr(value, "index", None)
-                if callable(length) and callable(index):
-                    for i in range(int(length())):
+                length_fn = getattr(value, "length", None)
+                index_fn = getattr(value, "index", None)
+                if callable(length_fn) and callable(index_fn):
+                    n = length_fn()
+                    for i in range(int(n) if isinstance(n, (int, float)) else 0):
                         try:
-                            yield from _iter_values(index(i), max_depth=max_depth, _depth=_depth + 1)
+                            yield from _iter_values(index_fn(i), max_depth=max_depth, _depth=_depth + 1)
                         except Exception:
                             continue
                     return
@@ -160,10 +164,7 @@ class ImageSplitter:
                 if guide in (None, 0, -1):
                     return False
 
-                if hasattr(guide, "get_id"):
-                    guide_id = guide.get_id()  # type: ignore[assignment]
-                else:
-                    guide_id = int(guide)
+                guide_id = guide.get_id() if hasattr(guide, "get_id") else int(guide)
 
                 # Found at least one guide.
                 return True
@@ -180,8 +181,8 @@ class ImageSplitter:
                     f"image_id={_safe_attr(image, 'get_id')}",
                     f"image_name={_safe_attr(image, 'get_name')}",
                     f"guide_scan start0={has_guides_0} start-1={has_guides_m1} => has_guides={has_guides}",
-                ]
-            )
+                ],
+            ),
         )
 
         # Best-effort list of images before splitting (not available in all bindings)
@@ -190,7 +191,7 @@ class ImageSplitter:
         if images_before_list is not None:
             _debug_log(
                 f"images_before count={len(images_before_list)} sample_type="
-                f"{type(images_before_list[0]).__name__ if images_before_list else 'n/a'}"
+                f"{type(images_before_list[0]).__name__ if images_before_list else 'n/a'}",
             )
 
         # Call guillotine procedure to split along guides
@@ -225,9 +226,10 @@ class ImageSplitter:
 
         # Log a small preview of the returned ValueArray to learn the signature
         try:
-            length = getattr(result, "length", None)
-            if callable(length):
-                n = int(length())
+            length_fn = getattr(result, "length", None)
+            if callable(length_fn):
+                n_raw = length_fn()
+                n = int(n_raw) if isinstance(n_raw, (int, float)) else 0
                 preview = []
                 for i in range(min(n, 8)):
                     try:
@@ -257,7 +259,7 @@ class ImageSplitter:
             images_after = {_image_key(i) for i in images_after_list}
             _debug_log(
                 f"images_after count={len(images_after_list)} sample_type="
-                f"{type(images_after_list[0]).__name__ if images_after_list else 'n/a'}"
+                f"{type(images_after_list[0]).__name__ if images_after_list else 'n/a'}",
             )
 
             new_keys = list(images_after - images_before)

@@ -47,10 +47,12 @@ def _list_property_names(obj: Any) -> list[str]:
     list_props = getattr(obj, "list_properties", None)
     if callable(list_props):
         try:
-            for spec in list_props():
-                name = getattr(spec, "name", None)
-                if isinstance(name, str):
-                    props.append(name)
+            result: Any = list_props()
+            if hasattr(result, "__iter__"):
+                for spec in result:
+                    name = getattr(spec, "name", None)
+                    if isinstance(name, str):
+                        props.append(name)
         except Exception:
             return []
     return props

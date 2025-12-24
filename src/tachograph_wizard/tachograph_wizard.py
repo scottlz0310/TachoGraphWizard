@@ -6,12 +6,12 @@ Main plugin class that registers procedures and handles GIMP plugin lifecycle.
 
 from __future__ import annotations
 
+import os
 import sys
 import traceback
-import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
-from datetime import datetime
 
 import gi
 
@@ -28,7 +28,7 @@ def _log_path() -> Path:
 
 def _debug_log(message: str) -> None:
     try:
-        timestamp = datetime.now().isoformat(timespec="seconds")
+        timestamp = datetime.now(tz=UTC).isoformat(timespec="seconds")
         line = f"[{timestamp}] {message}"
         with _log_path().open("a", encoding="utf-8") as fp:
             fp.write(line + "\n")
@@ -135,30 +135,20 @@ class TachographWizard(Gimp.PlugIn):
         # GIMP may fail silently unless we emit a message or write to stderr.
         _debug_log(f"_run_wizard invoked (run_mode={run_mode}, args_len={len(args)})")
 
-        # Normalize callback args.
-        # Different GIMP 3 builds/bindings may pass either:
-        #   (drawables, config, run_data)
-        # or:
-        #   (n_drawables, drawables, config, run_data)
+        # Normalize callback args: different GIMP 3 builds/bindings may pass either
+        # (drawables, config, run_data) or (n_drawables, drawables, config, run_data).
         drawables: Sequence[Gimp.Drawable] = []
-        config: Gimp.ProcedureConfig | None = None
 
         if args:
             if isinstance(args[0], int):
-                # (n_drawables, drawables, config, run_data)
                 if len(args) >= 2:
                     drawables = args[1]  # type: ignore[assignment]
-                if len(args) >= 3:
-                    config = args[2]  # type: ignore[assignment]
             else:
-                # (drawables, config, run_data)
                 drawables = args[0]  # type: ignore[assignment]
-                if len(args) >= 2:
-                    config = args[1]  # type: ignore[assignment]
 
         try:
             _debug_log(
-                f"args_types={[type(a).__name__ for a in args]} drawables_len={len(drawables) if hasattr(drawables, '__len__') else 'na'}"
+                f"args_types={[type(a).__name__ for a in args]} drawables_len={len(drawables) if hasattr(drawables, '__len__') else 'na'}",
             )
         except Exception:
             pass
