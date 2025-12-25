@@ -86,9 +86,40 @@ GIMP上で手動調整したテキストレイヤーの設定を読み取り、�
 - テンプレート保存機能
 
 ### Phase 4: 高度な機能
+- templateファイルから差し込みデータ用csvの雛形をエクスポート
 - 配置の自動推測
 - テンプレートの検証
 - エラーハンドリング
+
+## 実装方針（検証結果反映）
+
+### PDB呼び出し方針
+- `gimp-text-layer-get-*` は ProcedureConfig 経由で実行する
+  - `proc.create_config()` → `config.set_property("layer", layer)` → `proc.run(config)`
+- list引数による `run_procedure` は `CALLING_ERROR` になったため使用しない
+
+### 取得できる項目と保存方針
+- レイヤー名: `Text: field_name` から `field_name` を抽出してテンプレートのキーにする
+- 位置: `layer.get_offsets()` から `x_ratio / y_ratio` を算出
+  - `x_ratio = offset_x / image_width`
+  - `y_ratio = offset_y / image_height`
+- フォント名: `gimp-text-layer-get-font` の `Font.get_name()` を使用
+- フォントサイズ: `gimp-text-layer-get-font-size` の数値を使用
+  - 単位は `unit-name=pixels` だったため px として扱う
+  - `size_ratio = font_size_px / min(image_width, image_height)`
+- 色: `gimp-text-layer-get-color` から `rgba` を取得し `#RRGGBB` に変換
+- 水平方向: `gimp-text-layer-get-justification` の値を `left/center/right` に変換
+- 垂直方向: 当面 `top` 固定（推測 or UI入力は将来対応）
+- テキスト本文: `gimp-text-layer-get-text` が `None` のためテンプレートには保存しない
+  - 差し込みデータは CSV に保持する
+
+### レイヤーの対象判定
+- `Gimp.TextLayer` 判定または `layer.is_text_layer()` を利用
+- 非テキストレイヤーは除外する
+
+### 保存先
+- 既定はユーザーが選択（ダイアログで保存先選択）
+- 既存テンプレートと同名の場合は上書き確認を行う
 
 ## 関連ファイル
 

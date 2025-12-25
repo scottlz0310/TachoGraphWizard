@@ -65,7 +65,11 @@ class TachographWizard(Gimp.PlugIn):
             List containing the procedure name(s) this plugin provides.
         """
         _debug_log("do_query_procedures")
-        return ["tachograph-wizard", "tachograph-text-inserter"]
+        return [
+            "tachograph-wizard",
+            "tachograph-text-inserter",
+            "tachograph-template-exporter",
+        ]
 
     def do_create_procedure(self, name: str) -> Gimp.Procedure | None:
         """Create and return a procedure.
@@ -129,6 +133,35 @@ class TachographWizard(Gimp.PlugIn):
                 "Load vehicle data from CSV files and insert formatted text "
                 "using customizable templates. Supports position ratio management "
                 "and automatic font sizing for different image resolutions.",
+                name,
+            )
+            procedure.set_attribution(
+                "TachoGraphWizard Team",
+                "TachoGraphWizard Team",
+                "2025",
+            )
+
+            return procedure
+
+        if name == "tachograph-template-exporter":
+            procedure = Gimp.ImageProcedure.new(
+                self,
+                name,
+                Gimp.PDBProcType.PLUGIN,
+                self._run_template_exporter,
+                None,
+            )
+
+            procedure.set_image_types("*")
+            procedure.set_sensitivity_mask(Gimp.ProcedureSensitivityMask.DRAWABLE)
+
+            procedure.set_menu_label("Tachograph Template Exporter...")
+            procedure.set_icon_name(GimpUi.ICON_GEGL)
+            procedure.add_menu_path("<Image>/Filters/Processing")
+
+            procedure.set_documentation(
+                "Export template from text layers",
+                "Read text layer positions and formatting to export a JSON template.",
                 name,
             )
             procedure.set_attribution(
@@ -303,6 +336,68 @@ class TachographWizard(Gimp.PlugIn):
 
             # Return error status
             error_message = f"Error running text inserter: {e!s}"
+            return procedure.new_return_values(
+                Gimp.PDBStatusType.EXECUTION_ERROR,
+                GLib.Error(error_message),
+            )
+
+        return procedure.new_return_values(status, GLib.Error())
+
+    def _run_template_exporter(
+        self,
+        procedure: Gimp.Procedure,
+        run_mode: Gimp.RunMode,
+        image: Gimp.Image,
+        *args: object,
+    ) -> Gimp.ValueArray:
+        """Execute the template exporter procedure."""
+        _debug_log(f"_run_template_exporter invoked (run_mode={run_mode}, args_len={len(args)})")
+
+        drawables: Sequence[Gimp.Drawable] = []
+
+        if args:
+            if isinstance(args[0], int):
+                if len(args) >= 2:
+                    drawables = args[1]  # type: ignore[assignment]
+            else:
+                drawables = args[0]  # type: ignore[assignment]
+
+        try:
+            _debug_log(
+                f"args_types={[type(a).__name__ for a in args]} drawables_len={len(drawables) if hasattr(drawables, '__len__') else 'na'}",
+            )
+        except Exception:
+            pass
+
+        if run_mode == Gimp.RunMode.INTERACTIVE:
+            try:
+                GimpUi.init("tachograph-template-exporter")
+                _debug_log("GimpUi.init ok")
+            except Exception as exc:
+                _debug_log(f"GimpUi.init failed: {exc!s}")
+
+        from tachograph_wizard.procedures.template_exporter_procedure import run_template_exporter_dialog
+
+        try:
+            drawable = drawables[0] if drawables else None
+            _debug_log(f"running template exporter (drawable_present={drawable is not None})")
+            success = run_template_exporter_dialog(image, drawable)
+            status = Gimp.PDBStatusType.SUCCESS if success else Gimp.PDBStatusType.CANCEL
+        except Exception as e:
+            tb = traceback.format_exc()
+            _debug_log(f"error: {e!s}")
+            try:
+                sys.stderr.write(f"[tachograph_wizard] traceback:\n{tb}\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+            try:
+                Gimp.message(f"Tachograph Template Exporter error: {e!s}\n\n{tb}")
+            except Exception as exc:
+                _debug_log(f"Gimp.message(error) failed: {exc!s}")
+
+            error_message = f"Error running template exporter: {e!s}"
             return procedure.new_return_values(
                 Gimp.PDBStatusType.EXECUTION_ERROR,
                 GLib.Error(error_message),

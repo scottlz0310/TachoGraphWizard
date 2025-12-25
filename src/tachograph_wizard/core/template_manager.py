@@ -91,6 +91,10 @@ class TemplateManager:
         default_path = self.get_template_path("standard")
         return self.load_template(default_path)
 
+    def get_templates_dir(self) -> Path:
+        """Return the default templates directory path."""
+        return self._templates_dir
+
     def clear_cache(self) -> None:
         """Clear the template cache."""
         self._cache.clear()
