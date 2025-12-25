@@ -65,7 +65,7 @@ class TachographWizard(Gimp.PlugIn):
             List containing the procedure name(s) this plugin provides.
         """
         _debug_log("do_query_procedures")
-        return ["tachograph-wizard"]
+        return ["tachograph-wizard", "tachograph-text-inserter"]
 
     def do_create_procedure(self, name: str) -> Gimp.Procedure | None:
         """Create and return a procedure.
@@ -107,6 +107,38 @@ class TachographWizard(Gimp.PlugIn):
             )
 
             return procedure
+
+        if name == "tachograph-text-inserter":
+            procedure = Gimp.ImageProcedure.new(
+                self,
+                name,
+                Gimp.PDBProcType.PLUGIN,
+                self._run_text_inserter,
+                None,
+            )
+
+            procedure.set_image_types("*")
+            procedure.set_sensitivity_mask(Gimp.ProcedureSensitivityMask.DRAWABLE)
+
+            procedure.set_menu_label("Tachograph Text Inserter...")
+            procedure.set_icon_name(GimpUi.ICON_GEGL)
+            procedure.add_menu_path("<Image>/Filters/Processing")
+
+            procedure.set_documentation(
+                "Insert text from CSV files into tachograph charts",
+                "Load vehicle data from CSV files and insert formatted text "
+                "using customizable templates. Supports position ratio management "
+                "and automatic font sizing for different image resolutions.",
+                name,
+            )
+            procedure.set_attribution(
+                "TachoGraphWizard Team",
+                "TachoGraphWizard Team",
+                "2025",
+            )
+
+            return procedure
+
         return None
 
     def _run_wizard(
@@ -192,6 +224,85 @@ class TachographWizard(Gimp.PlugIn):
 
             # Return error status
             error_message = f"Error running wizard: {e!s}"
+            return procedure.new_return_values(
+                Gimp.PDBStatusType.EXECUTION_ERROR,
+                GLib.Error(error_message),
+            )
+
+        return procedure.new_return_values(status, GLib.Error())
+
+    def _run_text_inserter(
+        self,
+        procedure: Gimp.Procedure,
+        run_mode: Gimp.RunMode,
+        image: Gimp.Image,
+        *args: object,
+    ) -> Gimp.ValueArray:
+        """Execute the text inserter procedure.
+
+        Args:
+            procedure: The procedure being run.
+            run_mode: The run mode (interactive, non-interactive, etc.).
+            image: The image to process.
+            args: Additional arguments.
+
+        Returns:
+            ValueArray containing the procedure's return values.
+        """
+        _debug_log(f"_run_text_inserter invoked (run_mode={run_mode}, args_len={len(args)})")
+
+        # Normalize callback args
+        drawables: Sequence[Gimp.Drawable] = []
+
+        if args:
+            if isinstance(args[0], int):
+                if len(args) >= 2:
+                    drawables = args[1]  # type: ignore[assignment]
+            else:
+                drawables = args[0]  # type: ignore[assignment]
+
+        try:
+            _debug_log(
+                f"args_types={[type(a).__name__ for a in args]} drawables_len={len(drawables) if hasattr(drawables, '__len__') else 'na'}",
+            )
+        except Exception:
+            pass
+
+        # Initialize GimpUi for interactive mode
+        if run_mode == Gimp.RunMode.INTERACTIVE:
+            try:
+                GimpUi.init("tachograph-text-inserter")
+                _debug_log("GimpUi.init ok")
+            except Exception as exc:
+                _debug_log(f"GimpUi.init failed: {exc!s}")
+
+        # Import here to avoid circular imports
+        from tachograph_wizard.procedures.text_inserter_procedure import run_text_inserter_dialog
+
+        # Run the text inserter dialog
+        try:
+            drawable = drawables[0] if drawables else None
+            _debug_log(f"running text inserter dialog (drawable_present={drawable is not None})")
+            success = run_text_inserter_dialog(image, drawable)
+
+            # Return success or cancel status
+            status = Gimp.PDBStatusType.SUCCESS if success else Gimp.PDBStatusType.CANCEL
+        except Exception as e:
+            tb = traceback.format_exc()
+            _debug_log(f"error: {e!s}")
+            try:
+                sys.stderr.write(f"[tachograph_wizard] traceback:\n{tb}\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+            try:
+                Gimp.message(f"Tachograph Text Inserter error: {e!s}\n\n{tb}")
+            except Exception as exc:
+                _debug_log(f"Gimp.message(error) failed: {exc!s}")
+
+            # Return error status
+            error_message = f"Error running text inserter: {e!s}"
             return procedure.new_return_values(
                 Gimp.PDBStatusType.EXECUTION_ERROR,
                 GLib.Error(error_message),

@@ -80,14 +80,8 @@ def _set_config_property(config: Any, prop_name: str, value: Any) -> bool:
     return False
 
 
-def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log: Callable[[str], None] | None) -> None:
-    def _log(msg: str) -> None:
-        if debug_log is not None:
-            debug_log(msg)
-
+def _populate_config(config: Any, values: Sequence[Any]) -> None:
     prop_names = set(_list_property_names(config))
-    if prop_names:
-        _log(f"pdb_config props={sorted(prop_names)[:30]}")
 
     # Unwrap and map values by heuristic.
     for raw in values:
@@ -99,7 +93,6 @@ def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log
                 for cand in ("run-mode", "run_mode", "runmode"):
                     if (not prop_names) or (cand in prop_names):
                         if _set_config_property(config, cand, v):
-                            _log(f"pdb_config set {cand}={v}")
                             break
                 continue
         except Exception:
@@ -111,7 +104,6 @@ def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log
                 for cand in ("image",):
                     if (not prop_names) or (cand in prop_names):
                         if _set_config_property(config, cand, v):
-                            _log(f"pdb_config set {cand}=<Image>")
                             break
                 continue
         except Exception:
@@ -123,21 +115,18 @@ def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log
                 # First try singular "drawable"
                 if "drawable" in prop_names:
                     if _set_config_property(config, "drawable", v):
-                        _log("pdb_config set drawable=<Drawable>")
                         continue
                 # Then try "drawables" as a list
                 if "drawables" in prop_names:
                     # Try setting as Python list first
                     if _set_config_property(config, "drawables", [v]):
-                        _log("pdb_config set drawables=[Drawable]")
                         continue
                     # Fallback: just set the single drawable directly
                     try:
                         if _set_config_property(config, "drawables", v):
-                            _log("pdb_config set drawables=<Drawable> (single)")
                             continue
-                    except Exception as arr_e:
-                        _log(f"pdb_config drawables fallback failed: {arr_e}")
+                    except Exception:
+                        pass
                 continue
         except Exception:
             pass
@@ -148,28 +137,19 @@ def _populate_config(name: str, config: Any, values: Sequence[Any], *, debug_log
                 for cand in ("drawables", "value-array", "values"):
                     if (not prop_names) or (cand in prop_names):
                         if _set_config_property(config, cand, v):
-                            _log(f"pdb_config set {cand}=<ValueArray>")
                             break
                 continue
         except Exception:
             pass
 
-        # Fallback: ignore unknowns; we rely on defaults for now.
-        _log(f"pdb_config skip arg type={type(v).__name__} for {name}")
 
-
-def _create_procedure_config(proc: Any, *, debug_log: Callable[[str], None]) -> Any | None:
-    def _log(msg: str) -> None:
-        debug_log(msg)
-
+def _create_procedure_config(proc: Any) -> Any | None:
     create_config = getattr(proc, "create_config", None)
     if callable(create_config):
         try:
-            cfg = create_config()
-            _log("pdb_config created via procedure.create_config()")
-            return cfg
-        except Exception as e:
-            _log(f"pdb_config create_config failed: {type(e).__name__}: {e}")
+            return create_config()
+        except Exception:
+            pass
 
     # Try Gimp.ProcedureConfig constructors (names differ across builds)
     proc_cfg_cls = getattr(Gimp, "ProcedureConfig", None)
@@ -178,11 +158,9 @@ def _create_procedure_config(proc: Any, *, debug_log: Callable[[str], None]) -> 
             ctor = getattr(proc_cfg_cls, ctor_name, None)
             if callable(ctor):
                 try:
-                    cfg = ctor(proc)
-                    _log(f"pdb_config created via Gimp.ProcedureConfig.{ctor_name}(proc)")
-                    return cfg
-                except Exception as e:
-                    _log(f"pdb_config {ctor_name} failed: {type(e).__name__}: {e}")
+                    return ctor(proc)
+                except Exception:
+                    pass
 
     return None
 
@@ -207,10 +185,6 @@ def run_pdb_procedure(
         AttributeError/RuntimeError if no invocation path succeeds.
     """
 
-    def _log(msg: str) -> None:
-        if debug_log is not None:
-            debug_log(msg)
-
     pdb = Gimp.get_pdb()
     args_list = list(values)
     args_va = _make_value_array(values)
@@ -219,13 +193,9 @@ def run_pdb_procedure(
 
     def _try(label: str, fn: Callable[[], Any]) -> Any | None:
         try:
-            result = fn()
-            _log(f"pdb_call ok via {label}")
-            return result
+            return fn()
         except Exception as e:
-            err = f"pdb_call failed via {label}: {type(e).__name__}: {e}"
-            errors.append(err)
-            _log(err)
+            errors.append(f"{label}: {type(e).__name__}: {e}")
             return None
 
     # 1) PDB instance method (some builds)
@@ -266,18 +236,19 @@ def run_pdb_procedure(
                         return result
 
                 # 4) Some builds require a ProcedureConfig object
-                cfg = _create_procedure_config(proc, debug_log=_log)
+                cfg = _create_procedure_config(proc)
                 if cfg is not None:
                     try:
-                        _populate_config(name, cfg, values, debug_log=_log)
-                    except Exception as e:
-                        _log(f"pdb_config populate failed: {type(e).__name__}: {e}")
+                        _populate_config(cfg, values)
+                    except Exception:
+                        pass
 
                     result = _try("procedure.run(config)", lambda: proc_run(cfg))
                     if result is not None:
                         return result
 
-    msg = "Unable to run PDB procedure; no compatible binding entry point worked."
-    if errors:
-        msg += " Last errors: " + " | ".join(errors[-3:])
+    if debug_log:
+        debug_log(f"ERROR: Unable to run PDB procedure '{name}'. Last errors: {'; '.join(errors[-2:])}")
+
+    msg = f"Unable to run PDB procedure '{name}'"
     raise AttributeError(msg)
