@@ -13,6 +13,7 @@ A3スキャン画像に含まれる複数のタコグラフチャート（円盤
 ### 提供プラグイン
 1. **Tachograph Chart Wizard** - 画像処理プラグイン（分割・背景透明化・保存）
 2. **Tachograph Text Inserter** - テキスト挿入プラグイン（CSV・テンプレート対応）
+3. **Tachograph Template Exporter** - テキストレイヤーからテンプレートJSONを出力
 
 ---
 
@@ -62,7 +63,7 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
 
 4. **プラグインの確認**
 - メニューから **Filters > Processing** を開く
-- **Tachograph Chart Wizard...** と **Tachograph Text Inserter...** が表示されることを確認
+- **Tachograph Chart Wizard...** と **Tachograph Text Inserter...** と **Tachograph Template Exporter...** が表示されることを確認
 
 ---
 
@@ -108,6 +109,14 @@ vehicle_type,vehicle_no,driver
 JSONファイルを編集して、テキストの位置、フォント、色などをカスタマイズできます。
 
 詳細は `docs/phase2_implementation.md` を参照してください。
+
+---
+
+### Tachograph Template Exporter プラグイン
+
+1. テキストレイヤーを用意（レイヤー名は `text: <field>` 形式）
+2. メニューから **Filters > Processing > Tachograph Template Exporter...** を選択
+3. テンプレート名と保存先を指定して「Export Template」を実行
 
 ---
 
