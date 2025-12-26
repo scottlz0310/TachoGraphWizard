@@ -70,7 +70,7 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
 1. **分割**：ガイド分割（Slice Using Guides）または自動分割（Divide Scanned Images）
 2. **背景透明化**：Color to Alphaで白背景を透過
 3. **回転補正**：Correctiveモードで目視＋数値入力orマウスドラッグ 補助線活用
-4. **文字入れ**：テンプレート選択＋入力フォーム
+4. **文字入れ**：テンプレート選択＋日付選択＋CSV読み込み
 5. **保存**：命名規則（例：YYYYMMDD_車番_運転手.png）でPNG出力
 
 ---
@@ -80,25 +80,28 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
 ### Tachograph Text Inserter プラグイン
 
 #### 1. CSVファイルの準備
-`examples/sample_data.csv` を参考に、車両データを含むCSVファイルを作成します。
+`examples/sample_data.csv` を参考に、車両マスタCSVを作成します（必須列: `vehicle_type`, `vehicle_no`, `driver`）。
 
 ```csv
-vehicle_type,vehicle_no,driver,date_year,date_month,date_day
-普通車,123-45,山田太郎,2025,12,25
-トラック,678-90,佐藤花子,2025,12,26
+vehicle_type,vehicle_no,driver
+普通車,123-45,山田太郎
+トラック,678-90,佐藤花子
 ```
 
 **重要**: CSVファイルはUTF-8エンコーディングで保存してください。
+**日付**: CSVに `date` または `date_year/date_month/date_day` がある場合はその値を使用し、無い場合はUIで選択した日付を全行に適用します。
 
 #### 2. プラグインの起動
 1. GIMP 3で画像を開く
 2. メニューから **Filters > Processing > Tachograph Text Inserter...** を選択
 
 #### 3. テキスト挿入
-1. **テンプレート選択**: ドロップダウンから使用するテンプレートを選択（デフォルト: standard）
-2. **CSV読み込み**: 「Load CSV」ボタンをクリックして、CSVファイルを選択
-3. **行選択**: スピナーで挿入するデータ行を選択（プレビューで確認可能）
-4. **テキスト挿入**: 「Insert Text」ボタンをクリックしてテキストレイヤーを作成
+1. **テンプレートフォルダ選択（任意）**: 「Template Folder」でカスタムテンプレートの場所を選び、「Load Templates」をクリック
+2. **テンプレート選択**: ドロップダウンから使用するテンプレートを選択（デフォルト: standard）
+3. **CSV読み込み**: 「Load CSV」ボタンをクリックして、CSVファイルを選択
+4. **日付選択**: 前回選択値があればそれを初期値にし、無い場合は当日を設定
+5. **行選択**: スピナーで挿入するデータ行を選択（プレビューで確認可能）
+6. **テキスト挿入**: 「Insert Text」ボタンをクリックしてテキストレイヤーを作成
 
 #### テンプレートのカスタマイズ
 テンプレートは `src/tachograph_wizard/templates/default_templates/` に配置されています。

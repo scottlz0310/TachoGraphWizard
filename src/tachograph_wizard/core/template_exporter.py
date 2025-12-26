@@ -318,10 +318,7 @@ class TemplateExporter:
 
         font_size_value, font_unit = self._get_text_layer_value("gimp-text-layer-get-font-size", layer)[:2]
         font_size = float(font_size_value)
-        unit_name = getattr(font_unit, "get_name", None)
-        unit_label = unit_name() if callable(unit_name) else str(font_unit)
-        if isinstance(unit_label, str) and "pixel" not in unit_label.lower():
-            _debug_log(f"Unexpected font unit '{unit_label}', treating as pixels.")
+        font_size_px = self._font_size_to_pixels(font_size, font_unit)
 
         color = self._get_text_layer_value("gimp-text-layer-get-color", layer)[0]
         color_hex = _color_to_hex(color)
@@ -335,7 +332,7 @@ class TemplateExporter:
         )
         font_config = FontConfig(
             family=family,
-            size_ratio=font_size / self.shorter_side,
+            size_ratio=font_size_px / self.shorter_side,
             color=color_hex,
         )
         return TextField(
@@ -393,6 +390,38 @@ class TemplateExporter:
             raise TemplateExportError(msg)
 
         return values[1:]
+
+    def _font_size_to_pixels(self, font_size: float, font_unit: Any) -> float:
+        unit_name = getattr(font_unit, "get_name", None)
+        unit_label = unit_name() if callable(unit_name) else str(font_unit)
+        if isinstance(unit_label, str):
+            label = unit_label.lower()
+            if "pixel" in label:
+                return font_size
+            if "point" in label or label in {"pt"}:
+                dpi = self._get_image_dpi()
+                return font_size * (dpi / 72.0)
+
+        _debug_log(f"Unexpected font unit '{unit_label}', treating as pixels.")
+        return font_size
+
+    def _get_image_dpi(self) -> float:
+        try:
+            resolution = self.image.get_resolution()
+        except Exception:
+            resolution = None
+
+        if isinstance(resolution, (tuple, list)) and len(resolution) >= 2:
+            try:
+                x_res = float(resolution[0])
+                y_res = float(resolution[1])
+                dpi = y_res if y_res > 0 else x_res
+                if dpi > 0:
+                    return dpi
+            except (TypeError, ValueError):
+                pass
+
+        return 72.0
 
     @staticmethod
     def _template_to_dict(template: Template) -> dict[str, Any]:

@@ -51,6 +51,33 @@ ln -s /path/to/repo/src/tachograph_wizard ~/.config/GIMP/3.0/plug-ins/tachograph
 3. **ウィザードの手順に従う**:
    - 対話型ダイアログが、チャートの分割、クリーニング、回転、注釈付けをガイドします。
 
+## Tachograph Text Inserter の使い方
+
+Text Inserter はチャート紙1枚につき1回の実行を想定しています。
+
+### 1. CSVファイルの準備
+車両マスタCSVを用意します（必須列: `vehicle_type`, `vehicle_no`, `driver`）。
+
+```csv
+vehicle_type,vehicle_no,driver
+普通車,123-45,山田太郎
+トラック,678-90,佐藤花子
+```
+
+CSVに `date` または `date_year/date_month/date_day` がある場合はその値を使用します。無い場合はUIで選択した日付を全行に適用します。
+
+### 2. プラグインの起動
+1. GIMP 3で画像を開く
+2. メニューから **フィルター** > **Processing** > **Tachograph Text Inserter...** を選択
+
+### 3. テキスト挿入
+1. **テンプレートフォルダ選択（任意）**: カスタムテンプレートを使う場合は「Template Folder」で選択し、「Load Templates」をクリック
+2. **テンプレート選択**: 使用テンプレートを選ぶ
+3. **CSV読み込み**: 「Load CSV」で車両マスタCSVを選択
+4. **日付選択**: 前回選択値があればそれを初期値にし、無い場合は当日を設定
+5. **行選択**: 1枚のチャート紙に対応する行を選択
+6. **テキスト挿入**: 「Insert Text」でテキストレイヤーを作成
+
 ## トラブルシューティング
 
 - **プラグインが表示されない場合**

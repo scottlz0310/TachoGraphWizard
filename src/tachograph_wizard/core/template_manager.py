@@ -56,17 +56,28 @@ class TemplateManager:
             msg = f"Failed to parse JSON template: {e}"
             raise ValueError(msg) from e
 
+    def list_template_paths(self, templates_dir: Path | None = None) -> list[Path]:
+        """List template files in the provided directory.
+
+        Args:
+            templates_dir: Directory to search for templates. Defaults to built-in templates dir.
+
+        Returns:
+            List of template file paths.
+        """
+        search_dir = templates_dir or self._templates_dir
+        if not search_dir.exists():
+            return []
+
+        return sorted(search_dir.glob(f"*{self._file_extension}"))
+
     def list_templates(self) -> list[str]:
         """List available template names in the default templates directory.
 
         Returns:
             List of template names (without .json extension).
         """
-        if not self._templates_dir.exists():
-            return []
-
-        templates = sorted(self._templates_dir.glob(f"*{self._file_extension}"))
-        return [template.stem for template in templates]
+        return [template.stem for template in self.list_template_paths()]
 
     def get_template_path(self, template_name: str) -> Path:
         """Get the path to a template by name.

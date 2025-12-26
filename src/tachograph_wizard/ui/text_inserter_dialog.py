@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import os
 from pathlib import Path
 
@@ -33,6 +34,105 @@ def _debug_log(message: str) -> None:
         return
 
 
+class CsvDateError(ValueError):
+    """Raised when CSV date values are invalid."""
+
+    @classmethod
+    def from_components(cls, year: str, month: str, day: str) -> CsvDateError:
+        message = f"Invalid date components in CSV: {year}-{month}-{day}"
+        return cls(message)
+
+    @classmethod
+    def from_string(cls, value: str) -> CsvDateError:
+        message = f"Invalid date format in CSV: {value}"
+        return cls(message)
+
+
+def _get_settings_path() -> Path:
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "tachograph_wizard" / "settings.json"
+
+
+def _load_last_used_date() -> datetime.date | None:
+    settings_path = _get_settings_path()
+    try:
+        with settings_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        value = data.get("text_inserter_last_date")
+        if value:
+            return datetime.date.fromisoformat(value)
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        _debug_log(f"WARNING: Failed to read settings: {exc}")
+    return None
+
+
+def _save_last_used_date(selected_date: datetime.date) -> None:
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data["text_inserter_last_date"] = selected_date.isoformat()
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception as exc:
+        _debug_log(f"WARNING: Failed to save settings: {exc}")
+
+
+def _load_template_dir(default_dir: Path) -> Path:
+    settings_path = _get_settings_path()
+    try:
+        with settings_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        value = data.get("text_inserter_template_dir")
+        if value:
+            candidate = Path(value)
+            if candidate.exists():
+                return candidate
+    except FileNotFoundError:
+        return default_dir
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        _debug_log(f"WARNING: Failed to read settings: {exc}")
+    return default_dir
+
+
+def _save_template_dir(selected_dir: Path) -> None:
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data["text_inserter_template_dir"] = str(selected_dir)
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception as exc:
+        _debug_log(f"WARNING: Failed to save settings: {exc}")
+
+
+def _parse_date_string(value: str) -> datetime.date | None:
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
+        try:
+            return datetime.datetime.strptime(value, fmt).replace(tzinfo=datetime.UTC).date()
+        except ValueError:
+            continue
+    return None
+
+
 class TextInserterDialog(GimpUi.Dialog):
     """Dialog for inserting text from CSV files using templates."""
 
@@ -49,8 +149,12 @@ class TextInserterDialog(GimpUi.Dialog):
 
         self.image = image
         self.template_manager = TemplateManager()
+        self.default_templates_dir = self.template_manager.get_templates_dir()
+        self.template_dir = _load_template_dir(self.default_templates_dir)
+        self.template_paths: dict[str, Path] = {}
         self.csv_data: list[dict[str, str]] = []
         self.current_row_index = 0
+        self.default_date = _load_last_used_date() or datetime.date.today()
 
         # Set dialog properties
         self.set_default_size(500, 400)
@@ -84,6 +188,10 @@ class TextInserterDialog(GimpUi.Dialog):
         csv_frame = self._create_csv_section()
         content_area.pack_start(csv_frame, False, False, 0)
 
+        # Date selection section
+        date_frame = self._create_date_section()
+        content_area.pack_start(date_frame, False, False, 0)
+
         # Row selection section
         row_frame = self._create_row_section()
         content_area.pack_start(row_frame, False, False, 0)
@@ -103,6 +211,7 @@ class TextInserterDialog(GimpUi.Dialog):
         self.status_label.set_xalign(0.0)
         content_area.pack_start(self.status_label, False, False, 0)
 
+        self._refresh_template_list(self.template_dir)
         self.show_all()
 
     def _create_template_section(self) -> Gtk.Frame:
@@ -112,21 +221,39 @@ class TextInserterDialog(GimpUi.Dialog):
         box.set_border_width(6)
         frame.add(box)
 
+        dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        dir_label = Gtk.Label(label="Template Folder:")
+        dir_box.pack_start(dir_label, False, False, 0)
+
+        self.template_dir_button = Gtk.FileChooserButton(
+            title="Select Template Folder",
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        if self.template_dir.exists():
+            self.template_dir_button.set_current_folder(str(self.template_dir))
+        elif self.default_templates_dir.exists():
+            self.template_dir_button.set_current_folder(str(self.default_templates_dir))
+        else:
+            self.template_dir_button.set_current_folder(str(Path.home()))
+        dir_box.pack_start(self.template_dir_button, True, True, 0)
+        box.pack_start(dir_box, False, False, 0)
+
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        load_button = Gtk.Button(label="Load Templates")
+        load_button.connect("clicked", self._on_load_templates_clicked)
+        button_box.pack_start(load_button, False, False, 0)
+
+        default_button = Gtk.Button(label="Use Default Templates")
+        default_button.connect("clicked", self._on_use_default_templates_clicked)
+        button_box.pack_start(default_button, False, False, 0)
+        box.pack_start(button_box, False, False, 0)
+
         # Template combo box
         combo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         label = Gtk.Label(label="Template:")
         combo_box.pack_start(label, False, False, 0)
 
         self.template_combo = Gtk.ComboBoxText()
-        templates = self.template_manager.list_templates()
-
-        for template_name in templates:
-            self.template_combo.append_text(template_name)
-
-        # Select first template by default
-        if templates:
-            self.template_combo.set_active(0)
-
         combo_box.pack_start(self.template_combo, True, True, 0)
         box.pack_start(combo_box, False, False, 0)
 
@@ -171,9 +298,24 @@ class TextInserterDialog(GimpUi.Dialog):
 
         return frame
 
+    def _create_date_section(self) -> Gtk.Frame:
+        """Create the date selection section."""
+        frame = Gtk.Frame(label="Step 3: Select Date")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_border_width(6)
+        frame.add(box)
+
+        self.date_calendar = Gtk.Calendar()
+        self._set_calendar_date(self.default_date)
+        self.date_calendar.connect("day-selected", self._on_date_changed)
+        self.date_calendar.connect("month-changed", self._on_date_changed)
+        box.pack_start(self.date_calendar, False, False, 0)
+
+        return frame
+
     def _create_row_section(self) -> Gtk.Frame:
         """Create the row selection section."""
-        frame = Gtk.Frame(label="Step 3: Select Row")
+        frame = Gtk.Frame(label="Step 4: Select Row")
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_border_width(6)
         frame.add(box)
@@ -223,6 +365,85 @@ class TextInserterDialog(GimpUi.Dialog):
 
         return frame
 
+    def _refresh_template_list(self, templates_dir: Path) -> bool:
+        """Load templates from the specified directory."""
+        if not templates_dir.exists() or not templates_dir.is_dir():
+            self.template_combo.remove_all()
+            self.template_paths = {}
+            if hasattr(self, "status_label"):
+                self.status_label.set_text(f"Template folder not found: {templates_dir}")
+            return False
+
+        template_paths = self.template_manager.list_template_paths(templates_dir)
+        self.template_combo.remove_all()
+        self.template_paths = {}
+
+        if not template_paths:
+            if hasattr(self, "status_label"):
+                self.status_label.set_text(f"No templates found in {templates_dir}")
+            return False
+
+        names: list[str] = []
+        for path in template_paths:
+            name = path.stem
+            if name in self.template_paths:
+                suffix = 2
+                while f"{name} ({suffix})" in self.template_paths:
+                    suffix += 1
+                name = f"{name} ({suffix})"
+            self.template_combo.append_text(name)
+            self.template_paths[name] = path
+            names.append(name)
+
+        if "standard" in names:
+            self.template_combo.set_active(names.index("standard"))
+        else:
+            self.template_combo.set_active(0)
+
+        self.template_dir = templates_dir
+        return True
+
+    def _on_load_templates_clicked(self, button: Gtk.Button) -> None:
+        """Handle loading templates from the selected folder."""
+        folder = self.template_dir_button.get_filename()
+        if not folder:
+            self._show_error("Please select a template folder")
+            return
+
+        templates_dir = Path(folder)
+        if not self._refresh_template_list(templates_dir):
+            self._show_error(f"No templates found in {templates_dir}")
+            return
+
+        _save_template_dir(templates_dir)
+        self.status_label.set_text(f"Loaded {len(self.template_paths)} templates")
+
+    def _on_use_default_templates_clicked(self, button: Gtk.Button) -> None:
+        """Reset templates to the built-in default folder."""
+        if self.default_templates_dir.exists():
+            self.template_dir_button.set_current_folder(str(self.default_templates_dir))
+        if not self._refresh_template_list(self.default_templates_dir):
+            self._show_error("Default templates folder is missing")
+            return
+
+        _save_template_dir(self.default_templates_dir)
+        self.status_label.set_text("Loaded default templates")
+
+    def _set_calendar_date(self, date_value: datetime.date) -> None:
+        """Set the calendar selection to a specific date."""
+        # Gtk.Calendar months are 0-based.
+        self.date_calendar.select_month(date_value.month - 1, date_value.year)
+        self.date_calendar.select_day(date_value.day)
+
+    def _get_selected_date(self) -> datetime.date:
+        """Get the currently selected date from the calendar."""
+        year, month, day = self.date_calendar.get_date()
+        return datetime.date(year, month + 1, day)
+
+    def _on_date_changed(self, _calendar: Gtk.Calendar) -> None:
+        """Handle date selection changes."""
+        self._update_preview()
+
     def _on_load_csv_clicked(self, button: Gtk.Button) -> None:
         """Handle load CSV button click."""
         csv_path_str = self.csv_chooser.get_filename()
@@ -260,12 +481,63 @@ class TextInserterDialog(GimpUi.Dialog):
             return
 
         row = self.csv_data[self.current_row_index]
+        try:
+            row = self._build_row_data(row, strict=True)
+        except CsvDateError as exc:
+            self.preview_text.get_buffer().set_text(f"Invalid date in CSV: {exc}")
+            return
         preview_lines = []
         for key, value in row.items():
             preview_lines.append(f"{key}: {value}")
 
         preview_text = "\n".join(preview_lines)
         self.preview_text.get_buffer().set_text(preview_text)
+
+    def _resolve_date_from_row(
+        self,
+        row_data: dict[str, str],
+        *,
+        strict: bool,
+    ) -> tuple[datetime.date | None, str]:
+        year = row_data.get("date_year", "").strip()
+        month = row_data.get("date_month", "").strip()
+        day = row_data.get("date_day", "").strip()
+        if year or month or day:
+            if year and month and day:
+                try:
+                    return datetime.date(int(year), int(month), int(day)), "csv_parts"
+                except ValueError as exc:
+                    if strict:
+                        raise CsvDateError.from_components(year, month, day) from exc
+                    return None, "invalid"
+
+        date_value = row_data.get("date", "").strip()
+        if date_value:
+            parsed = _parse_date_string(date_value)
+            if parsed is None:
+                if strict:
+                    raise CsvDateError.from_string(date_value)
+                return None, "invalid"
+            return parsed, "csv_date"
+
+        return None, "none"
+
+    def _build_row_data(self, row_data: dict[str, str], *, strict: bool) -> dict[str, str]:
+        result = dict(row_data)
+        selected_date, source = self._resolve_date_from_row(row_data, strict=strict)
+        if selected_date is None:
+            selected_date = self._get_selected_date()
+            source = "ui"
+
+        if source != "csv_parts":
+            result["date_year"] = str(selected_date.year)
+            result["date_month"] = str(selected_date.month)
+            result["date_day"] = str(selected_date.day)
+
+        if not result.get("date", "").strip():
+            result["date"] = selected_date.isoformat()
+
+        return result
 
     def _on_insert_clicked(self, button: Gtk.Button) -> None:
         """Handle insert button click."""
@@ -285,19 +557,26 @@ class TextInserterDialog(GimpUi.Dialog):
                 self._show_error("Please select a template")
                 return
 
-            template_path = self.template_manager.get_template_path(template_name)
+            template_path = self.template_paths.get(template_name)
+            if template_path is None:
+                self._show_error("Selected template not found")
+                return
             template = self.template_manager.load_template(template_path)
 
             # Create text renderer
             renderer = TextRenderer(self.image, template)
 
             # Render text from current row
-            row_data = self.csv_data[self.current_row_index]
+            row_data = self._build_row_data(
+                self.csv_data[self.current_row_index],
+                strict=True,
+            )
             layers = renderer.render_from_csv_row(row_data)
 
             # Flush displays
             Gimp.displays_flush()
 
+            _save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Inserted {len(layers)} text layers")
 
         except Exception as e:
