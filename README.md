@@ -68,7 +68,7 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
 ---
 
 ## 処理フロー
-1. **分割**：ガイド分割（Slice Using Guides）または自動分割（Divide Scanned Images）
+1. **分割**：ガイド分割（Slice Using Guides）または自動切り分け（Auto Split/Beta）
 2. **背景透明化**：Color to Alphaで白背景を透過
 3. **回転補正**：Correctiveモードで目視＋数値入力orマウスドラッグ 補助線活用
 4. **文字入れ**：テンプレート選択＋日付選択＋CSV読み込み

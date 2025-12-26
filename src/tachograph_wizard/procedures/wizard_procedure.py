@@ -131,9 +131,59 @@ class TachographSimpleDialog(GimpUi.Dialog):
         label.set_xalign(0.0)
         box.pack_start(label, False, False, 0)
 
+        auto_threshold_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        auto_threshold_label = Gtk.Label(label="Auto Split Threshold Bias (0=Auto):")
+        auto_threshold_label.set_xalign(0.0)
+        auto_threshold_box.pack_start(auto_threshold_label, False, False, 0)
+
+        self.auto_threshold_adjustment = Gtk.Adjustment(
+            value=0,
+            lower=0,
+            upper=255,
+            step_increment=1,
+            page_increment=10,
+        )
+        auto_threshold_scale = Gtk.Scale(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            adjustment=self.auto_threshold_adjustment,
+        )
+        auto_threshold_scale.set_digits(0)
+        auto_threshold_box.pack_start(auto_threshold_scale, True, True, 0)
+        box.pack_start(auto_threshold_box, False, False, 0)
+
+        edge_frame = Gtk.Frame(label="Edge Trim (px)")
+        edge_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        edge_box.set_border_width(6)
+        edge_frame.add(edge_box)
+
+        edge_grid = Gtk.Grid()
+        edge_grid.set_column_spacing(6)
+        edge_grid.set_row_spacing(6)
+        edge_box.pack_start(edge_grid, False, False, 0)
+
+        self.auto_edge_trim_left = Gtk.Adjustment(value=0, lower=0, upper=200, step_increment=1, page_increment=10)
+        self.auto_edge_trim_right = Gtk.Adjustment(value=0, lower=0, upper=200, step_increment=1, page_increment=10)
+        self.auto_edge_trim_top = Gtk.Adjustment(value=0, lower=0, upper=200, step_increment=1, page_increment=10)
+        self.auto_edge_trim_bottom = Gtk.Adjustment(value=0, lower=0, upper=200, step_increment=1, page_increment=10)
+
+        edge_grid.attach(Gtk.Label(label="Left:"), 0, 0, 1, 1)
+        edge_grid.attach(Gtk.SpinButton(adjustment=self.auto_edge_trim_left, digits=0), 1, 0, 1, 1)
+        edge_grid.attach(Gtk.Label(label="Right:"), 2, 0, 1, 1)
+        edge_grid.attach(Gtk.SpinButton(adjustment=self.auto_edge_trim_right, digits=0), 3, 0, 1, 1)
+        edge_grid.attach(Gtk.Label(label="Top:"), 0, 1, 1, 1)
+        edge_grid.attach(Gtk.SpinButton(adjustment=self.auto_edge_trim_top, digits=0), 1, 1, 1, 1)
+        edge_grid.attach(Gtk.Label(label="Bottom:"), 2, 1, 1, 1)
+        edge_grid.attach(Gtk.SpinButton(adjustment=self.auto_edge_trim_bottom, digits=0), 3, 1, 1, 1)
+
+        box.pack_start(edge_frame, False, False, 0)
+
         split_button = Gtk.Button(label="Split Using Guides")
         split_button.connect("clicked", self._on_split_clicked)
         box.pack_start(split_button, False, False, 0)
+
+        auto_split_button = Gtk.Button(label="Auto Split (Beta)")
+        auto_split_button.connect("clicked", self._on_auto_split_clicked)
+        box.pack_start(auto_split_button, False, False, 0)
 
         return frame
 
@@ -226,6 +276,40 @@ class TachographSimpleDialog(GimpUi.Dialog):
             self._show_error(f"Split failed: {e}")
         except Exception as e:
             self._show_error(f"Unexpected error during split: {e}")
+
+    def _on_auto_split_clicked(self, button: Gtk.Button) -> None:
+        """Handle auto split button click."""
+        try:
+            from tachograph_wizard.core.image_splitter import ImageSplitter
+
+            threshold_value = int(self.auto_threshold_adjustment.get_value())
+            threshold_bias = threshold_value if threshold_value > 0 else None
+            edge_trim_left = int(self.auto_edge_trim_left.get_value())
+            edge_trim_right = int(self.auto_edge_trim_right.get_value())
+            edge_trim_top = int(self.auto_edge_trim_top.get_value())
+            edge_trim_bottom = int(self.auto_edge_trim_bottom.get_value())
+
+            self.split_images = ImageSplitter.split_by_auto_detect(
+                self.image,
+                threshold_bias=threshold_bias,
+                edge_trim_left=edge_trim_left,
+                edge_trim_right=edge_trim_right,
+                edge_trim_top=edge_trim_top,
+                edge_trim_bottom=edge_trim_bottom,
+            )
+
+            for img in self.split_images:
+                Gimp.Display.new(img)
+
+            Gimp.displays_flush()
+
+            count = len(self.split_images)
+            self.status_label.set_text(f"Auto-split into {count} images")
+
+        except ValueError as e:
+            self._show_error(f"Auto split failed: {e}")
+        except Exception as e:
+            self._show_error(f"Unexpected error during auto split: {e}")
 
     def _on_remove_background_clicked(self, button: Gtk.Button) -> None:
         """Handle remove background button click."""

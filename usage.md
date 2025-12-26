@@ -50,6 +50,7 @@ ln -s /path/to/repo/src/tachograph_wizard ~/.config/GIMP/3.0/plug-ins/tachograph
    - メニューから選択: **フィルター** > **Processing** > **Tachograph Chart Wizard...**
 3. **ウィザードの手順に従う**:
    - 対話型ダイアログが、チャートの分割、クリーニング、回転、注釈付けをガイドします。
+   - 分割はガイド分割に加えて **Auto Split（Beta）** を利用できます（しきい値バイアスとエッジトリムpxを調整可能）。
 
 ## Tachograph Text Inserter の使い方
 
