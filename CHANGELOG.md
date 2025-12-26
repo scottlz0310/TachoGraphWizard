@@ -2,6 +2,11 @@
 
 このドキュメントは現行仕様の要約と変更履歴を記載します。
 
+## [0.1.1] - 2025-12-26
+### 変更
+- CI/CDのPyPI publishジョブを削除
+- GitHub Release作成の権限を`contents: write`に更新
+
 ## [0.1.0] - 2025-12-26
 ### 追加
 - Tachograph Chart Wizard
