@@ -7,7 +7,6 @@ tachograph charts into individual images.
 from __future__ import annotations
 
 import datetime
-import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -131,8 +130,8 @@ class ImageSplitter:
                     return bytes(data)
                 get_data = getattr(data, "get_data", None)
                 if callable(get_data):
-                    return bytes(get_data())
-                return bytes(data)
+                    return bytes(get_data())  # type: ignore[arg-type]
+                return bytes(data)  # type: ignore[arg-type]
             except Exception as exc:
                 last_error = exc
                 continue
@@ -517,19 +516,23 @@ class ImageSplitter:
     def split_by_auto_detect(
         image: Gimp.Image,
         threshold_bias: int | None = None,
-        edge_trim_left: int = 0,
-        edge_trim_right: int = 0,
-        edge_trim_top: int = 0,
-        edge_trim_bottom: int = 0,
+        edge_trim_left: int = 0,  # noqa: ARG004 - kept for API compatibility
+        edge_trim_right: int = 0,  # noqa: ARG004 - kept for API compatibility
+        edge_trim_top: int = 0,  # noqa: ARG004 - kept for API compatibility
+        edge_trim_bottom: int = 0,  # noqa: ARG004 - kept for API compatibility
     ) -> list[Gimp.Image]:
         """Auto-detect tachograph charts and split into separate images.
 
-        Uses a downsampled mask + connected components to locate large
-        circular regions, then crops each region from the source image.
+        Simple algorithm:
+        1. Detect non-white regions using threshold (default 15)
+        2. Find connected components
+        3. Filter out small regions (< 1000px in either dimension)
+        4. Crop each remaining region
 
         Args:
             image: The image to analyze.
-            threshold_bias: Optional threshold bias (0-255, added to auto threshold).
+            threshold_bias: Threshold for non-white detection (default 15).
+                          Higher = more selective (only darker regions).
             edge_trim_left: Pixels trimmed from left edge (full-res).
             edge_trim_right: Pixels trimmed from right edge (full-res).
             edge_trim_top: Pixels trimmed from top edge (full-res).
@@ -543,10 +546,14 @@ class ImageSplitter:
         """
         ImageSplitter._debug_log("auto_split: start")
 
+        # Simple threshold for detecting light gray discs on white background
+        # Default 15 works well for light gray (RGB ~240) on white (RGB 255)
+        detection_threshold = threshold_bias if threshold_bias is not None else 15
+
         drawable = ImageSplitter._get_analysis_drawable(image)
         buffer = drawable.get_buffer()
-        scale = ImageSplitter._analysis_scale(drawable.get_width(), drawable.get_height())
 
+        # Get image dimensions
         try:
             rect = buffer.get_extent()
             src_width = int(rect.width)
@@ -563,308 +570,116 @@ class ImageSplitter:
                 rect.width = src_width
                 rect.height = src_height
 
-        data = ImageSplitter._buffer_get_bytes(buffer, rect, scale, "R'G'B'A u8")
-        out_width = max(1, round(src_width * scale))
-        out_height = max(1, round(src_height * scale))
-        pixel_count = len(data) // 4
-        if pixel_count <= 0:
-            msg = "Auto split failed: empty buffer"
-            raise ValueError(msg)
+        # Calculate minimum size for valid discs
+        # 125mm disc at 300dpi is ~1476px, use 2/3 of that as minimum = ~984px
+        # Default to 1000px, or calculate from DPI if available
+        dpi = ImageSplitter._get_image_dpi(image)
+        if dpi is not None and 50.0 <= dpi <= 1200.0:
+            min_size = int(ImageSplitter._DEFAULT_DIAMETER_MM / 25.4 * dpi * 2 / 3)
+        else:
+            min_size = 1000  # Default for ~300dpi scans
 
-        expected_pixels = out_width * out_height
-        if expected_pixels != pixel_count:
-            ratio = src_width / src_height if src_height > 0 else 1.0
-            out_width = max(1, round(math.sqrt(pixel_count * ratio)))
-            out_height = max(1, math.ceil(pixel_count / out_width))
-            expected_pixels = out_width * out_height
-            ImageSplitter._debug_log(
-                "auto_split: resized mask to match buffer "
-                f"(pixels={pixel_count} width={out_width} height={out_height})",
-            )
+        # Read full resolution data first (GIMP buffer doesn't support scaling in all versions)
+        data_full = ImageSplitter._buffer_get_bytes(buffer, rect, 1.0, "R'G'B'A u8")
 
-        buffer_width = out_width
-        buffer_height = out_height
-        buffer_scale_x = buffer_width / src_width if src_width > 0 else 1.0
-        buffer_scale_y = buffer_height / src_height if src_height > 0 else 1.0
+        # Calculate target analysis dimensions
+        analysis_scale = ImageSplitter._analysis_scale(src_width, src_height)
+        analysis_width = max(1, round(src_width * analysis_scale))
+        analysis_height = max(1, round(src_height * analysis_scale))
 
-        analysis_scale = ImageSplitter._analysis_scale(buffer_width, buffer_height)
-        analysis_width = max(1, round(buffer_width * analysis_scale))
-        analysis_height = max(1, round(buffer_height * analysis_scale))
+        # Manual downsampling: sample every Nth pixel
+        # This smooths noise and reduces processing time
+        data = bytearray(analysis_width * analysis_height * 4)
+        mv_full = memoryview(data_full)
 
-        analysis_scale_x = analysis_width / src_width if src_width > 0 else analysis_scale
-        analysis_scale_y = analysis_height / src_height if src_height > 0 else analysis_scale
+        for ay in range(analysis_height):
+            # Map analysis y to source y
+            sy = int(ay * src_height / analysis_height)
+            if sy >= src_height:
+                sy = src_height - 1
 
-        left_trim_scaled = max(0, round(edge_trim_left * analysis_scale_x))
-        right_trim_scaled = max(0, round(edge_trim_right * analysis_scale_x))
-        top_trim_scaled = max(0, round(edge_trim_top * analysis_scale_y))
-        bottom_trim_scaled = max(0, round(edge_trim_bottom * analysis_scale_y))
+            for ax in range(analysis_width):
+                # Map analysis x to source x
+                sx = int(ax * src_width / analysis_width)
+                if sx >= src_width:
+                    sx = src_width - 1
 
-        x_min = left_trim_scaled
-        x_max = analysis_width - right_trim_scaled
-        y_min = top_trim_scaled
-        y_max = analysis_height - bottom_trim_scaled
+                # Copy pixel from source to downsampled
+                src_offset = (sy * src_width + sx) * 4
+                dst_offset = (ay * analysis_width + ax) * 4
+                data[dst_offset : dst_offset + 4] = mv_full[src_offset : src_offset + 4]
+        analysis_scale_x = analysis_width / src_width if src_width > 0 else 1.0
+        analysis_scale_y = analysis_height / src_height if src_height > 0 else 1.0
 
-        if x_min >= x_max or y_min >= y_max:
-            msg = "Auto split failed: edge trim too large"
-            raise ValueError(msg)
-
-        mv = memoryview(data)
-        hist_luma = [0] * 256
-        hist_nonwhite = [0] * 256
-        total_pixels = 0
-
-        x_ranges: list[tuple[int, int]] = []
-        for x in range(analysis_width):
-            x0 = int(x * buffer_width / analysis_width)
-            x1 = int((x + 1) * buffer_width / analysis_width)
-            if x1 <= x0:
-                x1 = min(buffer_width, x0 + 1)
-            x_ranges.append((x0, x1))
-
-        y_ranges: list[tuple[int, int]] = []
-        for y in range(analysis_height):
-            y0 = int(y * buffer_height / analysis_height)
-            y1 = int((y + 1) * buffer_height / analysis_height)
-            if y1 <= y0:
-                y1 = min(buffer_height, y0 + 1)
-            y_ranges.append((y0, y1))
-
-        def _rgba_at(x: int, y: int) -> tuple[int, int, int, int]:
-            offset = (y * buffer_width + x) * 4
-            r = mv[offset]
-            g = mv[offset + 1]
-            b = mv[offset + 2]
-            a = mv[offset + 3]
-            return r, g, b, a
-
-        def _luma_from_rgba(r: int, g: int, b: int, a: int) -> int:
-            if a < 10:
-                return 255
-            return (r * 2126 + g * 7152 + b * 722) // 10000
-
-        def _nonwhite_from_rgba(r: int, g: int, b: int, a: int) -> int:
-            if a < 10:
-                return 0
-            return 255 - min(r, g, b)
-
-        def _sample_metrics(x0: int, x1m: int, y0: int, y1m: int, xc: int, yc: int) -> tuple[int, int]:
-            coords = ((x0, y0), (x1m, y0), (x0, y1m), (x1m, y1m), (xc, yc))
-            luma_sum = 0
-            nonwhite_sum = 0
-            for sx, sy in coords:
-                r, g, b, a = _rgba_at(sx, sy)
-                luma_sum += _luma_from_rgba(r, g, b, a)
-                nonwhite_sum += _nonwhite_from_rgba(r, g, b, a)
-            return luma_sum // 5, nonwhite_sum // 5
-
-        for y in range(analysis_height):
-            if y < y_min or y >= y_max:
-                continue
-            y0, y1 = y_ranges[y]
-            y1m = y1 - 1
-            yc = (y0 + y1m) // 2
-            for x in range(analysis_width):
-                if x < x_min or x >= x_max:
-                    continue
-                x0, x1 = x_ranges[x]
-                x1m = x1 - 1
-                xc = (x0 + x1m) // 2
-                luma, nonwhite = _sample_metrics(x0, x1m, y0, y1m, xc, yc)
-                hist_luma[int(luma)] += 1
-                hist_nonwhite[int(nonwhite)] += 1
-                total_pixels += 1
-
-        luma_threshold = ImageSplitter._otsu_threshold(hist_luma, total_pixels)
-        nonwhite_threshold = ImageSplitter._otsu_threshold(hist_nonwhite, total_pixels)
-        nonwhite_threshold = max(1, nonwhite_threshold)
-        if threshold_bias is not None:
-            luma_threshold = min(255, luma_threshold + threshold_bias)
-            nonwhite_threshold = max(1, nonwhite_threshold - threshold_bias)
-
+        # Log configuration
         ImageSplitter._debug_log(
-            "auto_split: threshold="
-            f"{luma_threshold} bias={threshold_bias or 0} "
-            f"nonwhite_threshold={nonwhite_threshold} "
-            f"scale=({analysis_scale_x:.3f},{analysis_scale_y:.3f}) "
-            f"buffer_scale=({buffer_scale_x:.3f},{buffer_scale_y:.3f}) "
-            f"trim=({edge_trim_left},{edge_trim_right},{edge_trim_top},{edge_trim_bottom}) "
+            f"auto_split: threshold={detection_threshold} min_size={min_size}px "
+            f"dpi={dpi if dpi else 'unknown'} scale=({analysis_scale_x:.3f},{analysis_scale_y:.3f}) "
             f"analysis=({analysis_width}x{analysis_height})",
         )
 
-        mask_luma = bytearray(analysis_width * analysis_height)
-        mask_nonwhite = bytearray(analysis_width * analysis_height)
+        # Create simple binary mask: nonwhite >= threshold
+        # For light gray discs on white background, this detects non-white regions
+        mask = bytearray(analysis_width * analysis_height)
         foreground_count = 0
-        foreground_count_nonwhite = 0
+
+        mv = memoryview(data)
+
+        # Simple threshold-based detection
+        # nonwhite = 255 - min(R,G,B), so for light gray (240,240,240) nonwhite=15
         for y in range(analysis_height):
-            if y < y_min or y >= y_max:
-                continue
-            y0, y1 = y_ranges[y]
-            y1m = y1 - 1
-            yc = (y0 + y1m) // 2
             row_offset = y * analysis_width
             for x in range(analysis_width):
-                if x < x_min or x >= x_max:
-                    continue
-                x0, x1 = x_ranges[x]
-                x1m = x1 - 1
-                xc = (x0 + x1m) // 2
-                luma, nonwhite = _sample_metrics(x0, x1m, y0, y1m, xc, yc)
-                idx = row_offset + x
-                if luma < luma_threshold:
-                    mask_luma[idx] = 1
-                    foreground_count += 1
-                if nonwhite >= nonwhite_threshold:
-                    mask_nonwhite[idx] = 1
-                    foreground_count_nonwhite += 1
+                offset = (y * analysis_width + x) * 4
+                r = mv[offset]
+                g = mv[offset + 1]
+                b = mv[offset + 2]
+                a = mv[offset + 3]
 
-        if foreground_count == 0 and foreground_count_nonwhite == 0:
-            msg = "Auto split failed: no foreground regions detected"
+                # Skip transparent pixels
+                if a < 10:
+                    continue
+
+                # Calculate nonwhite: how far from pure white
+                nonwhite = 255 - min(r, g, b)
+
+                # Mark as foreground if nonwhite exceeds threshold
+                if nonwhite >= detection_threshold:
+                    mask[row_offset + x] = 1
+                    foreground_count += 1
+
+        if foreground_count == 0:
+            msg = f"Auto split failed: no regions detected with threshold={detection_threshold}"
             raise ValueError(msg)
 
-        components_luma = (
-            ImageSplitter._find_components(mask_luma, analysis_width, analysis_height)
-            if foreground_count > 0
-            else []
-        )
-        components_nonwhite = (
-            ImageSplitter._find_components(mask_nonwhite, analysis_width, analysis_height)
-            if foreground_count_nonwhite > 0
-            else []
-        )
+        # Find connected components in the mask
+        components = ImageSplitter._find_components(mask, analysis_width, analysis_height)
 
-        def _select_candidates(
-            components: list[_Component],
-            metric_label: str,
-        ) -> tuple[list[_Component], float]:
-            if not components:
-                ImageSplitter._debug_log(
-                    f"auto_split: {metric_label} components=0 candidates=0",
-                )
-                return [], 0.0
+        ImageSplitter._debug_log(f"auto_split: found {len(components)} components")
 
-            non_edge_components = [
-                comp
-                for comp in components
-                if comp.min_x > x_min
-                and comp.max_x < x_max - 1
-                and comp.min_y > y_min
-                and comp.max_y < y_max - 1
-            ]
+        # Simple size filter: keep only components where BOTH width AND height >= min_size
+        # This filters out noise and small artifacts
+        candidates: list[_Component] = []
+        for comp in components:
+            # Convert component dimensions to full resolution
+            comp_width_full = int(comp.width / analysis_scale_x)
+            comp_height_full = int(comp.height / analysis_scale_y)
 
-            max_component = max(non_edge_components or components, key=lambda comp: comp.area)
-            min_dim = min(analysis_width, analysis_height)
-            min_roundish = max(8.0, min_dim * 0.08)
-            roundish = []
-            for comp in non_edge_components:
-                if comp.width <= 0 or comp.height <= 0:
-                    continue
-                ratio = comp.width / comp.height if comp.height else 0.0
-                ratio = max(ratio, 1.0 / ratio) if ratio > 0 else 999.0
-                if ratio > 1.6:
-                    continue
-                if comp.diameter < min_roundish:
-                    continue
-                roundish.append(comp)
-
-            expected_diameter_components = None
-            if roundish:
-                diameters = sorted(comp.diameter for comp in roundish)
-                median = diameters[len(diameters) // 2]
-                expected_diameter_components = median / min(analysis_scale_x, analysis_scale_y)
-
-            dpi = ImageSplitter._get_image_dpi(image)
-            expected_diameter_dpi = None
-            if dpi is not None:
-                expected_diameter_dpi = ImageSplitter._DEFAULT_DIAMETER_MM / 25.4 * dpi
-
-            if expected_diameter_components is not None:
-                if expected_diameter_dpi is None:
-                    expected_diameter = expected_diameter_components
-                    ImageSplitter._debug_log(
-                        f"auto_split: {metric_label} median diameter="
-                        f"{expected_diameter:.1f} from {len(roundish)} comps",
-                    )
-                else:
-                    ratio = expected_diameter_dpi / expected_diameter_components
-                    if ratio > 1.4 or ratio < 0.7:
-                        expected_diameter = expected_diameter_components
-                        ImageSplitter._debug_log(
-                            f"auto_split: {metric_label} dpi mismatch, using median diameter="
-                            f"{expected_diameter:.1f} (dpi={expected_diameter_dpi:.1f})",
-                        )
-                    else:
-                        expected_diameter = expected_diameter_dpi
-            elif expected_diameter_dpi is not None:
-                expected_diameter = expected_diameter_dpi
-            else:
-                expected_diameter = max_component.diameter / min(analysis_scale_x, analysis_scale_y)
-                ImageSplitter._debug_log(
-                    f"auto_split: {metric_label} fallback diameter="
-                    f"{expected_diameter:.1f}",
-                )
-
-            min_diameter = expected_diameter * ImageSplitter._MIN_DIAMETER_RATIO
-            min_diameter_scaled_x = min_diameter * analysis_scale_x
-            min_diameter_scaled_y = min_diameter * analysis_scale_y
-            min_box_scaled_x = min_diameter_scaled_x * 0.8
-            min_box_scaled_y = min_diameter_scaled_y * 0.8
-
-            candidates = []
-            for comp in components:
-                if comp.width < min_box_scaled_x or comp.height < min_box_scaled_y:
-                    continue
-                if comp.min_x < x_min or comp.max_x >= x_max:
-                    continue
-                if comp.min_y < y_min or comp.max_y >= y_max:
-                    continue
-                ratio = comp.width / comp.height if comp.height else 0.0
-                ratio = max(ratio, 1.0 / ratio) if ratio > 0 else 999.0
-                if ratio > 1.6:
-                    continue
-                coverage = comp.area / (comp.width * comp.height)
-                if coverage < 0.2:
-                    continue
+            # Filter: keep only if BOTH width AND height >= min_size
+            if comp_width_full >= min_size and comp_height_full >= min_size:
                 candidates.append(comp)
 
-            avg_coverage = 0.0
-            if candidates:
-                avg_coverage = sum(comp.area / (comp.width * comp.height) for comp in candidates) / len(candidates)
-            ImageSplitter._debug_log(
-                f"auto_split: {metric_label} components={len(components)} "
-                f"candidates={len(candidates)} coverage={avg_coverage:.3f}",
-            )
-            return candidates, expected_diameter
-
-        candidates_luma, diameter_luma = _select_candidates(components_luma, "luma")
-        candidates_nonwhite, diameter_nonwhite = _select_candidates(components_nonwhite, "nonwhite")
-
-        def _score(candidates: list[_Component]) -> tuple[int, float]:
-            if not candidates:
-                return (0, 0.0)
-            avg_coverage = sum(comp.area / (comp.width * comp.height) for comp in candidates) / len(candidates)
-            return (len(candidates), avg_coverage)
-
-        score_luma = _score(candidates_luma)
-        score_nonwhite = _score(candidates_nonwhite)
-
-        if score_nonwhite > score_luma:
-            candidates = candidates_nonwhite
-            expected_diameter = diameter_nonwhite
-            metric = "nonwhite"
-        else:
-            candidates = candidates_luma
-            expected_diameter = diameter_luma
-            metric = "luma"
-
-        if candidates:
-            ImageSplitter._debug_log(f"auto_split: selected metric={metric}")
         if not candidates:
-            msg = "Auto split failed: no chart-sized regions detected"
+            msg = f"Auto split failed: no regions >= {min_size}px found (found {len(components)} total components)"
             raise ValueError(msg)
 
+        ImageSplitter._debug_log(f"auto_split: {len(candidates)} candidates after size filter (>={min_size}px)")
+
+        # Sort candidates by position (top-to-bottom, left-to-right)
         candidates.sort(key=lambda comp: (comp.min_y, comp.min_x))
 
-        pad_px = max(2, int(expected_diameter * 0.02))
+        # Small padding around each disc
+        pad_px = 20
         created: list[Gimp.Image] = []
         for comp in candidates:
             x0 = int(comp.min_x / analysis_scale_x) - pad_px
