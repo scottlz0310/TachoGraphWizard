@@ -208,10 +208,12 @@ class BackgroundRemover:
         1. Create working layer copy for analysis
         2. Convert to grayscale + median blur + threshold
         3. Select background (white) using flood fill from corners
-        4. Invert selection to select disc
-        5. Apply selection to original layer to clear garbage
-        6. Crop to content
-        7. Remove working layer
+        4. Invert selection to select disc + noise
+        5. INTERSECT with ellipse to isolate disc area
+        6. Shrink+grow selection to keep only largest region (disc)
+        7. Invert and clear garbage on original layer
+        8. Crop to content
+        9. Remove working layer
 
         Args:
             drawable: Target drawable (layer) to process.
@@ -431,6 +433,31 @@ class BackgroundRemover:
             _debug_log("Selection is empty after intersection - threshold may need adjustment")
             image.remove_layer(work_layer)
             return
+
+        # 8.5. Remove small noise islands by shrinking then growing the selection
+        # This keeps only the largest connected component (the disc)
+        _debug_log("Removing small noise islands with shrink+grow")
+        shrink_amount = 10  # Shrink by 10px to remove small disconnected noise
+
+        run_pdb_procedure(
+            "gimp-selection-shrink",
+            [
+                GObject.Value(Gimp.Image, image),
+                GObject.Value(GObject.TYPE_INT, shrink_amount),
+            ],
+            debug_log=_debug_log,
+        )
+        _debug_log(f"Selection shrunk by {shrink_amount}px")
+
+        run_pdb_procedure(
+            "gimp-selection-grow",
+            [
+                GObject.Value(Gimp.Image, image),
+                GObject.Value(GObject.TYPE_INT, shrink_amount),
+            ],
+            debug_log=_debug_log,
+        )
+        _debug_log(f"Selection grown back by {shrink_amount}px")
 
         # 9. Invert again to select garbage (everything outside disc)
         _debug_log("Inverting selection again to select garbage")
