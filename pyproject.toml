@@ -1,6 +1,6 @@
 [project]
 name = "tachograph-wizard"
-version = "0.1.1"
+version = "1.0.0"
 description = "GIMP 3 plugin for processing tachograph chart scanned images"
 authors = [
     {name = "TachoGraphWizard Team", email = "tachograph@example.com"}

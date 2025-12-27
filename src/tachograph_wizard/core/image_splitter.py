@@ -675,6 +675,7 @@ class ImageSplitter:
     @staticmethod
     def split_by_auto_detect(
         image: Gimp.Image,
+        pad_px: int = 20,
         threshold_bias: int | None = None,
         edge_trim_left: int = 0,  # noqa: ARG004 - kept for API compatibility
         edge_trim_right: int = 0,  # noqa: ARG004 - kept for API compatibility
@@ -691,6 +692,7 @@ class ImageSplitter:
 
         Args:
             image: The image to analyze.
+            pad_px: Padding pixels to add around each detected disc (default 20).
             threshold_bias: Threshold for non-white detection (default 15).
                           Higher = more selective (only darker regions).
             edge_trim_left: Pixels trimmed from left edge (full-res).
@@ -839,7 +841,7 @@ class ImageSplitter:
         candidates.sort(key=lambda comp: (comp.min_y, comp.min_x))
 
         # Add padding around detected components for better background removal
-        pad_px = 20
+        # pad_px is now a parameter passed from the UI
         created: list[Gimp.Image] = []
 
         # Create a full-size mask to identify each component's pixels

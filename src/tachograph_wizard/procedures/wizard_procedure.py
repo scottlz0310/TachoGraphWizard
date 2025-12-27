@@ -125,14 +125,39 @@ class TachographSimpleDialog(GimpUi.Dialog):
         frame.add(box)
 
         label = Gtk.Label(
-            label="Split the scanned image using guides.\nMake sure you have added guides to your image first.",
+            label="Automatically split the scanned image into individual tachograph discs.",
         )
         label.set_line_wrap(True)
         label.set_xalign(0.0)
         box.pack_start(label, False, False, 0)
 
+        # Padding setting
+        padding_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        padding_label = Gtk.Label(label="Split Padding (px):")
+        padding_label.set_xalign(0.0)
+        padding_box.pack_start(padding_label, False, False, 0)
+
+        self.split_padding_adjustment = Gtk.Adjustment(
+            value=20,
+            lower=0,
+            upper=100,
+            step_increment=1,
+            page_increment=5,
+        )
+        split_padding_spin = Gtk.SpinButton(
+            adjustment=self.split_padding_adjustment,
+            digits=0,
+        )
+        padding_box.pack_start(split_padding_spin, False, False, 0)
+
+        info_label = Gtk.Label(label="  (Margin around each disc)")
+        info_label.set_xalign(0.0)
+        padding_box.pack_start(info_label, False, False, 0)
+        box.pack_start(padding_box, False, False, 0)
+
+        # Threshold bias
         auto_threshold_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        auto_threshold_label = Gtk.Label(label="Auto Split Threshold Bias (0=Auto):")
+        auto_threshold_label = Gtk.Label(label="Threshold Bias (0=Auto):")
         auto_threshold_label.set_xalign(0.0)
         auto_threshold_box.pack_start(auto_threshold_label, False, False, 0)
 
@@ -151,6 +176,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
         auto_threshold_box.pack_start(auto_threshold_scale, True, True, 0)
         box.pack_start(auto_threshold_box, False, False, 0)
 
+        # Edge trim settings
         edge_frame = Gtk.Frame(label="Edge Trim (px)")
         edge_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         edge_box.set_border_width(6)
@@ -177,13 +203,10 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
         box.pack_start(edge_frame, False, False, 0)
 
-        split_button = Gtk.Button(label="Split Using Guides")
-        split_button.connect("clicked", self._on_split_clicked)
+        # Split button
+        split_button = Gtk.Button(label="Split Images")
+        split_button.connect("clicked", self._on_auto_split_clicked)
         box.pack_start(split_button, False, False, 0)
-
-        auto_split_button = Gtk.Button(label="Auto Split (Beta)")
-        auto_split_button.connect("clicked", self._on_auto_split_clicked)
-        box.pack_start(auto_split_button, False, False, 0)
 
         return frame
 
@@ -195,31 +218,34 @@ class TachographSimpleDialog(GimpUi.Dialog):
         frame.add(box)
 
         label = Gtk.Label(
-            label="Remove white background from split images.",
+            label="Remove background outside the circular disc area.",
         )
         label.set_xalign(0.0)
         box.pack_start(label, False, False, 0)
 
-        # Threshold adjustment
-        threshold_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        threshold_label = Gtk.Label(label="Threshold:")
-        threshold_box.pack_start(threshold_label, False, False, 0)
+        # Ellipse padding adjustment
+        ellipse_padding_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        ellipse_padding_label = Gtk.Label(label="Ellipse Padding (px):")
+        ellipse_padding_label.set_xalign(0.0)
+        ellipse_padding_box.pack_start(ellipse_padding_label, False, False, 0)
 
-        self.threshold_adjustment = Gtk.Adjustment(
-            value=15.0,
-            lower=0.0,
-            upper=100.0,
-            step_increment=1.0,
-            page_increment=10.0,
+        self.ellipse_padding_adjustment = Gtk.Adjustment(
+            value=20,
+            lower=0,
+            upper=100,
+            step_increment=1,
+            page_increment=5,
         )
-        threshold_scale = Gtk.Scale(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            adjustment=self.threshold_adjustment,
+        ellipse_padding_spin = Gtk.SpinButton(
+            adjustment=self.ellipse_padding_adjustment,
+            digits=0,
         )
-        threshold_scale.set_digits(1)
-        threshold_box.pack_start(threshold_scale, True, True, 0)
+        ellipse_padding_box.pack_start(ellipse_padding_spin, False, False, 0)
 
-        box.pack_start(threshold_box, False, False, 0)
+        ellipse_info_label = Gtk.Label(label="  (Inset from edge)")
+        ellipse_info_label.set_xalign(0.0)
+        ellipse_padding_box.pack_start(ellipse_info_label, False, False, 0)
+        box.pack_start(ellipse_padding_box, False, False, 0)
 
         remove_bg_button = Gtk.Button(label="Remove Background")
         remove_bg_button.connect("clicked", self._on_remove_background_clicked)
@@ -255,33 +281,12 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
         return frame
 
-    def _on_split_clicked(self, button: Gtk.Button) -> None:
-        """Handle split button click."""
-        try:
-            from tachograph_wizard.core.image_splitter import ImageSplitter
-
-            self.split_images = ImageSplitter.split_by_guides(self.image)
-
-            # Display each split image in GIMP
-            for img in self.split_images:
-                Gimp.Display.new(img)
-
-            # Flush displays to show them immediately
-            Gimp.displays_flush()
-
-            count = len(self.split_images)
-            self.status_label.set_text(f"Split into {count} images")
-
-        except ValueError as e:
-            self._show_error(f"Split failed: {e}")
-        except Exception as e:
-            self._show_error(f"Unexpected error during split: {e}")
-
     def _on_auto_split_clicked(self, button: Gtk.Button) -> None:
         """Handle auto split button click."""
         try:
             from tachograph_wizard.core.image_splitter import ImageSplitter
 
+            split_padding = int(self.split_padding_adjustment.get_value())
             threshold_value = int(self.auto_threshold_adjustment.get_value())
             threshold_bias = threshold_value if threshold_value > 0 else None
             edge_trim_left = int(self.auto_edge_trim_left.get_value())
@@ -291,6 +296,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
             self.split_images = ImageSplitter.split_by_auto_detect(
                 self.image,
+                pad_px=split_padding,
                 threshold_bias=threshold_bias,
                 edge_trim_left=edge_trim_left,
                 edge_trim_right=edge_trim_right,
@@ -320,7 +326,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
         try:
             from tachograph_wizard.core.background_remover import BackgroundRemover
 
-            threshold = self.threshold_adjustment.get_value()
+            ellipse_padding = int(self.ellipse_padding_adjustment.get_value())
 
             for img in self.split_images:
                 # Create undo group for this image
@@ -334,8 +340,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
                         layer = layers[0]
                         BackgroundRemover.process_background(
                             layer,
-                            threshold=threshold,
-                            apply_despeckle=False,  # Disabled until GIMP 3 API is figured out
+                            ellipse_padding=ellipse_padding,
                         )
                 finally:
                     # Always end undo group, even if there was an error
