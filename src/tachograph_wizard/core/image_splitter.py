@@ -245,6 +245,166 @@ class ImageSplitter:
         )
 
     @staticmethod
+    def _apply_component_mask(
+        image: Gimp.Image,
+        comp_mask: bytearray,
+        mask_width: int,
+        mask_height: int,
+        crop_x: int,
+        crop_y: int,
+        scale_x: float,
+        scale_y: float,
+        threshold: int,  # noqa: ARG004
+    ) -> None:
+        """Remove garbage pixels outside the component mask.
+
+        Creates a layer mask from the component mask, making pixels outside
+        the detected component transparent while preserving all pixels within it.
+
+        Args:
+            image: Cropped image to clean up
+            comp_mask: Binary mask (analysis resolution) of the component
+            mask_width: Width of the analysis mask
+            mask_height: Height of the analysis mask
+            crop_x: X offset of crop in original image
+            crop_y: Y offset of crop in original image
+            scale_x: Analysis scale factor X
+            scale_y: Analysis scale factor Y
+            threshold: Detection threshold used (same as used for detection)
+        """
+        try:
+            layers = image.get_layers()
+            if not layers:
+                return
+
+            layer = layers[0]
+            img_width = image.get_width()
+            img_height = image.get_height()
+
+            # Ensure layer has alpha channel
+            if not layer.has_alpha():
+                layer.add_alpha()
+
+            # Build a selection from the component mask
+            # Start with empty selection
+            run_pdb_procedure(
+                "gimp-selection-none",
+                [GObject.Value(Gimp.Image, image)],
+                debug_log=ImageSplitter._debug_log,
+            )
+
+            # Find bounding box of component in analysis coordinates
+            min_ax, max_ax = mask_width, 0
+            min_ay, max_ay = mask_height, 0
+            component_pixel_count = 0
+            for ay in range(mask_height):
+                for ax in range(mask_width):
+                    if comp_mask[ay * mask_width + ax] == 1:
+                        min_ax = min(min_ax, ax)
+                        max_ax = max(max_ax, ax)
+                        min_ay = min(min_ay, ay)
+                        max_ay = max(max_ay, ay)
+                        component_pixel_count += 1
+
+            ImageSplitter._debug_log(
+                f"garbage_removal: component bbox in analysis coords: "
+                f"x=[{min_ax},{max_ax}] y=[{min_ay},{max_ay}] pixels={component_pixel_count}",
+            )
+
+            # Convert to full resolution coordinates
+            full_min_x = int((min_ax / scale_x) - crop_x)
+            full_max_x = int((max_ax / scale_x) - crop_x)
+            full_min_y = int((min_ay / scale_y) - crop_y)
+            full_max_y = int((max_ay / scale_y) - crop_y)
+
+            ImageSplitter._debug_log(
+                f"garbage_removal: bbox in cropped image coords (before clamp): "
+                f"x=[{full_min_x},{full_max_x}] y=[{full_min_y},{full_max_y}]",
+            )
+
+            # Clamp to image bounds
+            full_min_x = max(0, full_min_x)
+            full_max_x = min(img_width - 1, full_max_x)
+            full_min_y = max(0, full_min_y)
+            full_max_y = min(img_height - 1, full_max_y)
+
+            # Select the approximate component area using ellipse (better for circular discs)
+            width = full_max_x - full_min_x + 1
+            height = full_max_y - full_min_y + 1
+
+            ImageSplitter._debug_log(
+                f"garbage_removal: ellipse selection params: "
+                f"x={full_min_x} y={full_min_y} w={width} h={height} "
+                f"(image size: {img_width}x{img_height})",
+            )
+
+            if width > 0 and height > 0:
+                # Select component area with ellipse
+                run_pdb_procedure(
+                    "gimp-image-select-ellipse",
+                    [
+                        GObject.Value(Gimp.Image, image),
+                        GObject.Value(Gimp.ChannelOps, Gimp.ChannelOps.REPLACE),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(full_min_x)),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(full_min_y)),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(width)),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(height)),
+                    ],
+                    debug_log=ImageSplitter._debug_log,
+                )
+
+                # Feather selection slightly to avoid hard edges
+                run_pdb_procedure(
+                    "gimp-selection-feather",
+                    [
+                        GObject.Value(Gimp.Image, image),
+                        GObject.Value(GObject.TYPE_DOUBLE, 2.0),  # 2px feather
+                    ],
+                    debug_log=ImageSplitter._debug_log,
+                )
+
+                # Invert to select garbage (outside ellipse)
+                run_pdb_procedure(
+                    "gimp-selection-invert",
+                    [GObject.Value(Gimp.Image, image)],
+                    debug_log=ImageSplitter._debug_log,
+                )
+
+                # Check if selection is empty
+                is_empty_result = run_pdb_procedure(
+                    "gimp-selection-is-empty",
+                    [GObject.Value(Gimp.Image, image)],
+                    debug_log=ImageSplitter._debug_log,
+                )
+                is_empty = is_empty_result.index(1)  # Second return value is the boolean
+
+                if is_empty:
+                    ImageSplitter._debug_log("garbage_removal: selection is empty, nothing to delete")
+                else:
+                    # Delete garbage (make selected area transparent)
+                    run_pdb_procedure(
+                        "gimp-drawable-edit-clear",
+                        [GObject.Value(Gimp.Drawable, layer)],
+                        debug_log=ImageSplitter._debug_log,
+                    )
+                    ImageSplitter._debug_log("garbage_removal: deleted garbage outside ellipse")
+
+                # Remove selection
+                run_pdb_procedure(
+                    "gimp-selection-none",
+                    [GObject.Value(Gimp.Image, image)],
+                    debug_log=ImageSplitter._debug_log,
+                )
+
+                ImageSplitter._debug_log("garbage_removal: applied successfully")
+            else:
+                ImageSplitter._debug_log("garbage_removal: component too small, skipped")
+
+        except Exception as e:
+            ImageSplitter._debug_log(f"garbage_removal failed: {type(e).__name__}: {e}")
+            # Continue without garbage removal if it fails
+
+    @staticmethod
     def split_by_guides(image: Gimp.Image) -> list[Gimp.Image]:
         """Split image using existing guides.
 
@@ -678,10 +838,34 @@ class ImageSplitter:
         # Sort candidates by position (top-to-bottom, left-to-right)
         candidates.sort(key=lambda comp: (comp.min_y, comp.min_x))
 
-        # Small padding around each disc
+        # Add padding around detected components for better background removal
         pad_px = 20
         created: list[Gimp.Image] = []
-        for comp in candidates:
+
+        # Create a full-size mask to identify each component's pixels
+        # We'll use this to remove garbage from cropped images
+        component_masks: list[bytearray] = []
+        for _comp_idx, comp in enumerate(candidates):
+            # Create a mask for just this component
+            comp_mask = bytearray(analysis_width * analysis_height)
+
+            # Fill the mask by checking which pixels belong to this component
+            # We need to re-run connected component detection to isolate this component
+            # For efficiency, we'll mark all pixels within the component's bounding box
+            # that are foreground pixels in the original mask
+            for y in range(comp.min_y, comp.max_y + 1):
+                row_offset = y * analysis_width
+                for x in range(comp.min_x, comp.max_x + 1):
+                    idx = row_offset + x
+                    if mask[idx] == 1:  # Foreground pixel
+                        # Check if this pixel is connected to the component
+                        # For now, just include all foreground pixels in the bounding box
+                        comp_mask[idx] = 1
+
+            component_masks.append(comp_mask)
+
+        # Crop each component
+        for _comp_idx, comp in enumerate(candidates):
             x0 = int(comp.min_x / analysis_scale_x) - pad_px
             y0 = int(comp.min_y / analysis_scale_y) - pad_px
             x1 = int((comp.max_x + 1) / analysis_scale_x) + pad_px
@@ -695,8 +879,13 @@ class ImageSplitter:
             width = max(1, x1 - x0)
             height = max(1, y1 - y0)
 
+            # Duplicate and crop
             dup = ImageSplitter._duplicate_image(image)
             ImageSplitter._crop_image(dup, x0, y0, width, height)
+
+            # NOTE: Auto garbage removal within Auto Split is disabled
+            # Background removal is now handled by the separate Remove Background step
+
             created.append(dup)
 
         if not created:

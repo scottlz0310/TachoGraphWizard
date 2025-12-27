@@ -198,17 +198,410 @@ class BackgroundRemover:
         _debug_log("Despeckle skipped - no working method found (this is optional)")
 
     @staticmethod
+    def auto_cleanup_and_crop(
+        drawable: Gimp.Drawable,
+        threshold: int = 220,
+    ) -> None:
+        """Auto cleanup and crop using working layer analysis.
+
+        Algorithm:
+        1. Create working layer copy for analysis
+        2. Convert to grayscale + median blur + threshold
+        3. Select background (white) using flood fill from corners
+        4. Invert selection to select disc
+        5. Apply selection to original layer to clear garbage
+        6. Crop to content
+        7. Remove working layer
+
+        Args:
+            drawable: Target drawable (layer) to process.
+            threshold: Threshold value (0-255) for binarization.
+        """
+        from tachograph_wizard.core.pdb_runner import run_pdb_procedure
+
+        _debug_log(f"auto_cleanup_and_crop called: threshold={threshold}")
+
+        image = drawable.get_image()
+
+        # Ensure layer has alpha channel
+        if not drawable.has_alpha():
+            drawable.add_alpha()
+
+        # 1. Create working layer copy (for analysis only)
+        _debug_log("Creating working layer copy")
+        work_layer = drawable.copy()
+        image.insert_layer(work_layer, None, 0)
+
+        # 2. Convert working layer to grayscale
+        _debug_log("Converting working layer to grayscale")
+        run_pdb_procedure(
+            "gimp-drawable-desaturate",
+            [
+                GObject.Value(Gimp.Drawable, work_layer),
+                GObject.Value(Gimp.DesaturateMode, Gimp.DesaturateMode.LIGHTNESS),
+            ],
+            debug_log=_debug_log,
+        )
+
+        # 3. Apply median blur to remove noise (skip if not available in GIMP 3.0)
+        try:
+            run_pdb_procedure(
+                "plug-in-median-blur",
+                [
+                    GObject.Value(Gimp.Drawable, work_layer),
+                    GObject.Value(GObject.TYPE_DOUBLE, 4.0),
+                    GObject.Value(GObject.TYPE_DOUBLE, 50.0),
+                ],
+            )
+        except Exception:
+            pass  # Median blur not available in GIMP 3.0, skip silently
+
+        # 4. Apply threshold using GEGL (PDB version is broken in GIMP 3.0)
+        # UI threshold (0-100) means "tolerance from white"
+        # threshold=15 → white(255) ± 15 → 225-255 should be white (background)
+        lower_threshold = max(0, 255 - threshold * 2)  # Scale UI range appropriately
+        _debug_log(f"Applying GEGL threshold: {lower_threshold}-255 (background becomes white)")
+
+        try:
+            # Use GEGL threshold operation
+            from gi.repository import Gegl
+
+            # Get work_layer's buffer
+            buffer = work_layer.get_buffer()
+
+            # Create GEGL graph with threshold operation
+            graph = Gegl.Node()
+            src = graph.create_child("gegl:buffer-source")
+            src.set_property("buffer", buffer)
+
+            threshold_node = graph.create_child("gimp:threshold")
+            threshold_node.set_property("low", float(lower_threshold) / 255.0)
+            threshold_node.set_property("high", 1.0)
+
+            sink = graph.create_child("gegl:buffer-sink")
+            sink.set_property("buffer", buffer)
+
+            # Connect nodes
+            src.connect_to("output", threshold_node, "input")
+            threshold_node.connect_to("output", sink, "input")
+
+            # Process
+            sink.process()
+
+            _debug_log("GEGL threshold processing completed")
+
+            # Update the layer
+            work_layer.update(0, 0, work_layer.get_width(), work_layer.get_height())
+
+        except Exception as e:
+            _debug_log(f"GEGL threshold failed: {e}, trying manual buffer approach")
+
+            # Fallback: Manual threshold via GeglBuffer
+            try:
+                from gi.repository import Gegl
+
+                from tachograph_wizard.core.image_splitter import ImageSplitter
+
+                buffer = work_layer.get_buffer()
+                rect = buffer.get_extent()
+                width = int(rect.width)
+                height = int(rect.height)
+
+                # Read pixel data
+                full_rect = Gegl.Rectangle()
+                full_rect.x = 0
+                full_rect.y = 0
+                full_rect.width = width
+                full_rect.height = height
+
+                pixel_data = ImageSplitter._buffer_get_bytes(buffer, full_rect, 1.0, "R'G'B'A u8")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+                if pixel_data:
+                    # Manual threshold: convert to bytearray for modification
+                    pixels = bytearray(pixel_data)
+
+                    for i in range(0, len(pixels), 4):
+                        # Get grayscale value (R=G=B for grayscale)
+                        gray = pixels[i]
+
+                        # Apply threshold: if gray >= lower_threshold -> white (255), else black (0)
+                        if gray >= lower_threshold:
+                            pixels[i] = 255  # R
+                            pixels[i + 1] = 255  # G
+                            pixels[i + 2] = 255  # B
+                        else:
+                            pixels[i] = 0
+                            pixels[i + 1] = 0
+                            pixels[i + 2] = 0
+                        # Keep alpha as is
+
+                    # Write back to buffer
+                    buffer.set(full_rect, "R'G'B'A u8", bytes(pixels))
+                    work_layer.update(0, 0, width, height)
+
+                    _debug_log("Manual threshold via GeglBuffer completed")
+                else:
+                    _debug_log("ERROR: Failed to read pixel data from buffer")
+
+            except Exception as e2:
+                _debug_log(f"Manual threshold also failed: {e2}")
+
+        # 5. Select background (white) using fuzzy select from corners
+        _debug_log("Selecting background from corners")
+        width = image.get_width()
+        height = image.get_height()
+        corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+
+        selected = False
+        for x, y in corners:
+            try:
+                run_pdb_procedure(
+                    "gimp-image-select-contiguous-color",
+                    [
+                        GObject.Value(Gimp.Image, image),
+                        GObject.Value(Gimp.ChannelOps, Gimp.ChannelOps.ADD),
+                        GObject.Value(Gimp.Drawable, work_layer),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(x)),
+                        GObject.Value(GObject.TYPE_DOUBLE, float(y)),
+                    ],
+                    debug_log=_debug_log,
+                )
+                selected = True
+                _debug_log(f"Selected background from corner ({x}, {y})")
+            except Exception as e:
+                _debug_log(f"Failed to select from corner ({x}, {y}): {e}")
+
+        if not selected:
+            _debug_log("Failed to select background from any corner")
+            image.remove_layer(work_layer)
+            return
+
+        # 6. Invert selection to select disc + noise
+        _debug_log("Inverting selection to select disc + noise")
+        run_pdb_procedure(
+            "gimp-selection-invert",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+
+        # Check if selection is empty BEFORE intersection
+        result_before = run_pdb_procedure(
+            "gimp-selection-is-empty",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+        is_empty_before = result_before.index(1)
+        _debug_log(f"Selection empty before intersection: {is_empty_before}")
+
+        # 7. Create ellipse selection for the disc area and INTERSECT
+        # This removes noise outside the disc area, keeping only the main disc
+        # The disc should be centered in the cropped image
+        _debug_log("Creating ellipse selection to isolate disc")
+
+        # Use a large ellipse that covers most of the image (disc area)
+        margin = 50  # Leave some margin from edges
+        ellipse_x = margin
+        ellipse_y = margin
+        ellipse_w = max(1, width - margin * 2)
+        ellipse_h = max(1, height - margin * 2)
+
+        run_pdb_procedure(
+            "gimp-image-select-ellipse",
+            [
+                GObject.Value(Gimp.Image, image),
+                GObject.Value(Gimp.ChannelOps, Gimp.ChannelOps.INTERSECT),  # INTERSECT!
+                GObject.Value(GObject.TYPE_DOUBLE, float(ellipse_x)),
+                GObject.Value(GObject.TYPE_DOUBLE, float(ellipse_y)),
+                GObject.Value(GObject.TYPE_DOUBLE, float(ellipse_w)),
+                GObject.Value(GObject.TYPE_DOUBLE, float(ellipse_h)),
+            ],
+            debug_log=_debug_log,
+        )
+        _debug_log(f"Intersected with ellipse at ({ellipse_x},{ellipse_y}) size {ellipse_w}x{ellipse_h}")
+
+        # 8. Check if selection is empty
+        result = run_pdb_procedure(
+            "gimp-selection-is-empty",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+        is_empty = result.index(1)
+
+        if is_empty:
+            _debug_log("Selection is empty after intersection - threshold may need adjustment")
+            image.remove_layer(work_layer)
+            return
+
+        # 9. Invert again to select garbage (everything outside disc)
+        _debug_log("Inverting selection again to select garbage")
+        run_pdb_procedure(
+            "gimp-selection-invert",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+
+        # 10. Clear garbage on original drawable
+        _debug_log("Clearing garbage on original layer")
+        run_pdb_procedure(
+            "gimp-drawable-edit-clear",
+            [GObject.Value(Gimp.Drawable, drawable)],
+            debug_log=_debug_log,
+        )
+
+        # 11. Remove selection
+        _debug_log("Removing selection")
+        run_pdb_procedure(
+            "gimp-selection-none",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+
+        # 12. Remove working layer
+        _debug_log("Removing working layer")
+        image.remove_layer(work_layer)
+
+        # 13. Crop to content
+        _debug_log("Cropping to content")
+        try:
+            # Try autocrop method first
+            if hasattr(image, "autocrop"):
+                image.autocrop()
+                _debug_log("Autocrop via image.autocrop() succeeded")
+            else:
+                # Fallback to PDB
+                run_pdb_procedure(
+                    "gimp-image-crop",
+                    [
+                        GObject.Value(Gimp.Image, image),
+                        GObject.Value(GObject.TYPE_INT, image.get_width()),
+                        GObject.Value(GObject.TYPE_INT, image.get_height()),
+                        GObject.Value(GObject.TYPE_INT, 0),
+                        GObject.Value(GObject.TYPE_INT, 0),
+                    ],
+                    debug_log=_debug_log,
+                )
+                _debug_log("Crop skipped (autocrop not available)")
+        except Exception as e:
+            _debug_log(f"Autocrop failed (non-critical): {e}")
+
+        _debug_log("auto_cleanup_and_crop completed")
+
+    @staticmethod
+    def remove_garbage_keep_largest_island(
+        drawable: Gimp.Drawable,
+        threshold: float = 15.0,
+    ) -> None:
+        """Remove garbage by keeping only the largest non-white island.
+
+        Simplified algorithm:
+        1. Apply color-to-alpha to remove white background
+        2. Use select-by-alpha to select non-transparent areas
+        3. Shrink+grow to remove small islands
+        4. Invert and delete garbage
+
+        Args:
+            drawable: Target drawable (layer) to process.
+            threshold: Color matching threshold (0-100) for selecting white.
+        """
+        from tachograph_wizard.core.pdb_runner import run_pdb_procedure
+
+        _debug_log(f"remove_garbage_keep_largest_island called: threshold={threshold}")
+
+        image = drawable.get_image()
+
+        # Ensure layer has alpha channel
+        if not drawable.has_alpha():
+            drawable.add_alpha()
+
+        # Step 1: First apply color-to-alpha to remove white background
+        # This makes white areas transparent
+        _debug_log("Applying color-to-alpha to remove white")
+        BackgroundRemover.color_to_alpha(drawable, None, threshold)
+
+        # Step 2: Select by alpha (select non-transparent areas = the disc and any noise)
+        _debug_log("Selecting non-transparent areas")
+        try:
+            # Try GIMP 3.0 method: select-item
+            run_pdb_procedure(
+                "gimp-image-select-item",
+                [
+                    GObject.Value(Gimp.Image, image),
+                    GObject.Value(Gimp.ChannelOps, Gimp.ChannelOps.REPLACE),
+                    GObject.Value(Gimp.Item, drawable),
+                ],
+                debug_log=_debug_log,
+            )
+            _debug_log("Selected using gimp-image-select-item")
+        except Exception as e:
+            _debug_log(f"gimp-image-select-item failed: {e}, trying alternative")
+            # Alternative: create selection from alpha
+            run_pdb_procedure(
+                "gimp-selection-all",
+                [GObject.Value(Gimp.Image, image)],
+                debug_log=_debug_log,
+            )
+            _debug_log("Selected all as fallback")
+
+        # Step 3: Shrink then grow to remove small disconnected islands
+        # This removes small noise while preserving the main disc
+        _debug_log("Shrinking selection to remove small islands")
+        run_pdb_procedure(
+            "gimp-selection-shrink",
+            [
+                GObject.Value(Gimp.Image, image),
+                GObject.Value(GObject.TYPE_INT, 10),  # Shrink by 10px
+            ],
+            debug_log=_debug_log,
+        )
+
+        _debug_log("Growing selection back")
+        run_pdb_procedure(
+            "gimp-selection-grow",
+            [
+                GObject.Value(Gimp.Image, image),
+                GObject.Value(GObject.TYPE_INT, 10),  # Grow back by 10px
+            ],
+            debug_log=_debug_log,
+        )
+
+        # Step 4: Invert selection (now selecting garbage/noise)
+        _debug_log("Inverting selection to select garbage")
+        run_pdb_procedure(
+            "gimp-selection-invert",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+
+        # Step 5: Clear the garbage (make it transparent)
+        _debug_log("Clearing garbage")
+        run_pdb_procedure(
+            "gimp-drawable-edit-clear",
+            [GObject.Value(Gimp.Drawable, drawable)],
+            debug_log=_debug_log,
+        )
+
+        # Remove selection
+        _debug_log("Removing selection")
+        run_pdb_procedure(
+            "gimp-selection-none",
+            [GObject.Value(Gimp.Image, image)],
+            debug_log=_debug_log,
+        )
+
+        _debug_log("remove_garbage_keep_largest_island completed")
+
+    @staticmethod
     def process_background(
         drawable: Gimp.Drawable,
-        remove_color: Gegl.Color | None = None,
+        remove_color: Gegl.Color | None = None,  # noqa: ARG004
         threshold: float = 15.0,
-        apply_despeckle: bool = True,
-        despeckle_radius: int = 2,
+        apply_despeckle: bool = True,  # noqa: ARG004
+        despeckle_radius: int = 2,  # noqa: ARG004
+        use_island_method: bool = False,
     ) -> None:
         """Complete background removal process.
 
-        Applies both color-to-alpha and despeckle operations in sequence
-        for comprehensive background cleaning.
+        Applies either island-based removal or color-to-alpha based removal.
 
         Args:
             drawable: Target drawable (layer) to process.
@@ -216,14 +609,16 @@ class BackgroundRemover:
             threshold: Color matching threshold (0-100).
             apply_despeckle: Whether to apply despeckle filter.
             despeckle_radius: Radius for despeckle operation.
+            use_island_method: Use island-based removal (DISABLED - has issues).
         """
-        _debug_log(f"process_background called: threshold={threshold}, apply_despeckle={apply_despeckle}")
+        _debug_log(f"process_background called: threshold={threshold}, use_island_method={use_island_method}")
 
-        # Apply despeckle first (before making background transparent)
-        if apply_despeckle:
-            BackgroundRemover.despeckle(drawable, despeckle_radius)
-
-        # Then apply color to alpha
-        BackgroundRemover.color_to_alpha(drawable, remove_color, threshold)
+        # Use new working-layer-based cleanup method
+        # Threshold determines what's background: threshold-255 = white (background), 0-(threshold-1) = black (disc)
+        # Convert float threshold (0-100) to int (0-255) if needed
+        threshold_int = int(threshold) if threshold <= 100 else int(threshold * 2.55)
+        threshold_int = max(0, min(255, threshold_int))  # Clamp to 0-255
+        _debug_log(f"Using threshold={threshold_int} for auto_cleanup_and_crop")
+        BackgroundRemover.auto_cleanup_and_crop(drawable, threshold=threshold_int)
 
         _debug_log("process_background completed")

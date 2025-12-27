@@ -323,15 +323,23 @@ class TachographSimpleDialog(GimpUi.Dialog):
             threshold = self.threshold_adjustment.get_value()
 
             for img in self.split_images:
-                # Get layers - GIMP 3 uses get_layers() instead of get_active_layer()
-                layers = img.get_layers()
-                if layers:
-                    layer = layers[0]
-                    BackgroundRemover.process_background(
-                        layer,
-                        threshold=threshold,
-                        apply_despeckle=False,  # Disabled until GIMP 3 API is figured out
-                    )
+                # Create undo group for this image
+                # This allows Ctrl+Z to undo the background removal
+                img.undo_group_start()
+
+                try:
+                    # Get layers - GIMP 3 uses get_layers() instead of get_active_layer()
+                    layers = img.get_layers()
+                    if layers:
+                        layer = layers[0]
+                        BackgroundRemover.process_background(
+                            layer,
+                            threshold=threshold,
+                            apply_despeckle=False,  # Disabled until GIMP 3 API is figured out
+                        )
+                finally:
+                    # Always end undo group, even if there was an error
+                    img.undo_group_end()
 
             Gimp.displays_flush()
 

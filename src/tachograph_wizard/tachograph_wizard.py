@@ -37,6 +37,14 @@ def _debug_log(message: str) -> None:
         pass
 
 
+# Clear log file on module import
+try:
+    log_file = _log_path()
+    if log_file.exists():
+        log_file.unlink()
+except Exception:
+    pass
+
 _debug_log(f"module imported from: {__file__}")
 
 
