@@ -482,7 +482,7 @@ class BackgroundRemover:
                     selected = True
                     _debug_log(f"Selected background from corner ({x}, {y})")
                 except Exception as e2:
-                    _debug_log(f"Failed to select from corner ({x}, {y}): {e2}")
+                    _debug_log(f"Failed to select from corner ({x}, {y}): {e2}")  # nosec B608
 
             if not selected:
                 _debug_log("Failed to select background")
