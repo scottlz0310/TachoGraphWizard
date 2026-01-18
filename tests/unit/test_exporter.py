@@ -137,3 +137,248 @@ class TestExporter:
 
         # Verify directory was created
         assert output_path.parent.exists()
+
+    def test_is_success_status_with_bool_true(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with boolean True."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        assert Exporter._is_success_status(True) is True
+
+    def test_is_success_status_with_bool_false(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with boolean False."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        assert Exporter._is_success_status(False) is False
+
+    def test_is_success_status_with_none(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with None."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        assert Exporter._is_success_status(None) is False
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_is_success_status_with_success_int(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with SUCCESS integer."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Set up the SUCCESS value properly
+        mock_gimp.PDBStatusType.SUCCESS = 0
+        
+        # SUCCESS is 0
+        assert Exporter._is_success_status(0) is True
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_is_success_status_with_failure_int(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with non-SUCCESS integer."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Set up the SUCCESS value properly
+        mock_gimp.PDBStatusType.SUCCESS = 0
+        
+        # Non-zero is failure
+        assert Exporter._is_success_status(1) is False
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_is_success_status_with_tuple(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with tuple containing SUCCESS."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Set up the SUCCESS value properly
+        mock_gimp.PDBStatusType.SUCCESS = 0
+        
+        assert Exporter._is_success_status((0, "data")) is True
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_is_success_status_with_list(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with list containing SUCCESS."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Set up the SUCCESS value properly
+        mock_gimp.PDBStatusType.SUCCESS = 0
+        
+        assert Exporter._is_success_status([0, "data"]) is True
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_is_success_status_with_index_method(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test _is_success_status with object having index method."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Set up the SUCCESS value properly
+        mock_gimp.PDBStatusType.SUCCESS = 0
+        
+        result = MagicMock()
+        result.index.return_value = 0  # SUCCESS
+        assert Exporter._is_success_status(result) is True
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_try_file_api_save_with_file_save_success(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_drawable: MagicMock,
+    ) -> None:
+        """Test _try_file_api_save succeeds with Gimp.file_save."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_file = MagicMock()
+        mock_gimp.file_save = MagicMock(return_value=True)
+        
+        # Execute
+        result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
+
+        # Verify
+        assert result is True
+        mock_gimp.file_save.assert_called_once()
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_try_file_api_save_with_file_export_success(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_drawable: MagicMock,
+    ) -> None:
+        """Test _try_file_api_save succeeds with Gimp.file_export."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_file = MagicMock()
+        mock_gimp.file_save = MagicMock(side_effect=Exception("Not available"))
+        mock_gimp.file_export = MagicMock(return_value=True)
+        
+        # Execute
+        result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
+
+        # Verify
+        assert result is True
+        mock_gimp.file_export.assert_called_once()
+
+    @patch("tachograph_wizard.core.exporter.Gimp")
+    def test_try_file_api_save_with_no_api_available(
+        self,
+        mock_gimp: MagicMock,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_drawable: MagicMock,
+    ) -> None:
+        """Test _try_file_api_save returns False when no API available."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_file = MagicMock()
+        # Remove both save methods
+        del mock_gimp.file_save
+        del mock_gimp.file_export
+        
+        # Execute
+        result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
+
+        # Verify
+        assert result is False
+
+    def test_get_fallback_drawable_with_active_drawable(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_drawable: MagicMock,
+    ) -> None:
+        """Test _get_fallback_drawable returns active drawable."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_image.get_active_drawable.return_value = mock_drawable
+
+        # Execute
+        result = Exporter._get_fallback_drawable(mock_image)
+
+        # Verify
+        assert result == mock_drawable
+
+    def test_get_fallback_drawable_with_active_layer(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_layer: MagicMock,
+    ) -> None:
+        """Test _get_fallback_drawable returns active layer when no active drawable."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_image.get_active_drawable.return_value = None
+        mock_image.get_active_layer.return_value = mock_layer
+
+        # Execute
+        result = Exporter._get_fallback_drawable(mock_image)
+
+        # Verify
+        assert result == mock_layer
+
+    def test_get_fallback_drawable_with_get_layers(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+        mock_layer: MagicMock,
+    ) -> None:
+        """Test _get_fallback_drawable uses get_layers as last resort."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_image.get_active_drawable.return_value = None
+        mock_image.get_active_layer.return_value = None
+        mock_image.get_layers.return_value = [mock_layer]
+
+        # Execute
+        result = Exporter._get_fallback_drawable(mock_image)
+
+        # Verify
+        assert result == mock_layer
+
+    def test_get_fallback_drawable_returns_none(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+        mock_image: MagicMock,
+    ) -> None:
+        """Test _get_fallback_drawable returns None when no drawable available."""
+        from tachograph_wizard.core.exporter import Exporter
+
+        # Setup
+        mock_image.get_active_drawable.return_value = None
+        mock_image.get_active_layer.return_value = None
+        mock_image.get_layers.return_value = []
+
+        # Execute
+        result = Exporter._get_fallback_drawable(mock_image)
+
+        # Verify
+        assert result is None
