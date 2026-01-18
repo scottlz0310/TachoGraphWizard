@@ -17,7 +17,7 @@ import gi
 gi.require_version("Gimp", "3.0")
 gi.require_version("Gio", "2.0")
 
-from gi.repository import Gio, Gimp
+from gi.repository import Gimp, Gio
 
 
 def _make_value_array(values: Sequence[Any]) -> Any | None:

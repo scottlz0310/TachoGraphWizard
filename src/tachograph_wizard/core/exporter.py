@@ -23,6 +23,30 @@ class Exporter:
     """Export processed images to PNG with alpha channel."""
 
     @staticmethod
+    def _get_fallback_drawable(image: Gimp.Image) -> Gimp.Drawable | None:
+        active_getters = ("get_active_drawable", "get_active_layer")
+        for method_name in active_getters:
+            getter = getattr(image, method_name, None)
+            if callable(getter):
+                try:
+                    drawable = getter()
+                except Exception:
+                    drawable = None
+                if drawable is not None:
+                    return drawable
+
+        layers_getter = getattr(image, "get_layers", None)
+        if callable(layers_getter):
+            try:
+                layers = layers_getter()
+            except Exception:
+                layers = None
+            if isinstance(layers, (list, tuple)) and layers:
+                return layers[0]
+
+        return None
+
+    @staticmethod
     def save_png(
         image: Gimp.Image,
         output_path: Path,
@@ -46,18 +70,8 @@ class Exporter:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Flatten or merge layers
-        if flatten:
-            image.flatten()
-        else:
-            # Merge visible layers while preserving transparency
-            image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
-
-        # Get the active drawable (layer)
-        drawable = image.get_active_drawable()
-
-        # Ensure alpha channel exists
-        if not drawable.has_alpha():
-            drawable.add_alpha()
+        # Merge visible layers while preserving transparency
+        merged_drawable = image.flatten() if flatten else image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
 
         # Create Gio.File for the output path
         # IMPORTANT: Use forward slashes for cross-platform compatibility
@@ -67,18 +81,39 @@ class Exporter:
         # Save as PNG using GIMP 3 file save procedure
         try:
             # Get all drawables to export
-            num_drawables, drawables = image.get_selected_drawables()
-            if (not drawables) or (num_drawables <= 0):
-                drawable = image.get_active_drawable()
-                if drawable is None:
-                    layers = image.get_layers()
-                    if layers:
-                        drawable = layers[0]
+            get_selected_drawables = getattr(image, "get_selected_drawables", None)
+            if callable(get_selected_drawables):
+                result = get_selected_drawables()
+                if isinstance(result, tuple) and len(result) == 2:
+                    num_drawables, drawables = result
+                else:
+                    num_drawables, drawables = 0, []
+            else:
+                num_drawables, drawables = 0, []
+
+            drawables_list: list[Gimp.Drawable] = []
+            if isinstance(drawables, (list, tuple)):
+                drawables_list = list(drawables)
+            elif drawables:
+                drawables_list = [drawables]
+
+            try:
+                num_drawables = int(num_drawables)
+            except Exception:
+                num_drawables = len(drawables_list)
+
+            if (not drawables_list) or (num_drawables <= 0):
+                drawable = merged_drawable or Exporter._get_fallback_drawable(image)
                 if drawable is None:
                     msg = "No drawable available for PNG export"
                     raise RuntimeError(msg)
-                drawables = [drawable]
+                drawables_list = [drawable]
                 num_drawables = 1
+
+            # Ensure alpha channel exists
+            for drawable in drawables_list:
+                if not drawable.has_alpha():
+                    drawable.add_alpha()
 
             result = run_pdb_procedure(
                 "file-png-save",
@@ -87,7 +122,7 @@ class Exporter:
                     GObject.Value(Gimp.Image, image),
                     GObject.Value(GObject.TYPE_INT, num_drawables),
                     Gimp.ValueArray.new_from_values(
-                        [GObject.Value(Gimp.Drawable, d) for d in drawables],
+                        [GObject.Value(Gimp.Drawable, d) for d in drawables_list],
                     ),
                     GObject.Value(Gio.File, file),
                 ],
