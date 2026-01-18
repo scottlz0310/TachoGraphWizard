@@ -187,7 +187,7 @@ def _populate_config(config: Any, values: Sequence[Any]) -> None:
                     next_val = _unwrap_gvalue(values[idx + 1])
                     if isinstance(next_val, (Gimp.ValueArray, Gimp.Drawable)):
                         next_is_drawable_related = True
-                
+
                 # Only map to drawable count properties if context suggests it
                 if next_is_drawable_related:
                     for cand in ("num-drawables", "n-drawables", "num_drawables", "n_drawables"):

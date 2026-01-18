@@ -176,7 +176,7 @@ class TestExporter:
 
         # Set up the SUCCESS value properly
         mock_gimp.PDBStatusType.SUCCESS = 0
-        
+
         # SUCCESS is 0
         assert Exporter._is_success_status(0) is True
 
@@ -191,7 +191,7 @@ class TestExporter:
 
         # Set up the SUCCESS value properly
         mock_gimp.PDBStatusType.SUCCESS = 0
-        
+
         # Non-zero is failure
         assert Exporter._is_success_status(1) is False
 
@@ -206,7 +206,7 @@ class TestExporter:
 
         # Set up the SUCCESS value properly
         mock_gimp.PDBStatusType.SUCCESS = 0
-        
+
         assert Exporter._is_success_status((0, "data")) is True
 
     @patch("tachograph_wizard.core.exporter.Gimp")
@@ -220,7 +220,7 @@ class TestExporter:
 
         # Set up the SUCCESS value properly
         mock_gimp.PDBStatusType.SUCCESS = 0
-        
+
         assert Exporter._is_success_status([0, "data"]) is True
 
     @patch("tachograph_wizard.core.exporter.Gimp")
@@ -234,7 +234,7 @@ class TestExporter:
 
         # Set up the SUCCESS value properly
         mock_gimp.PDBStatusType.SUCCESS = 0
-        
+
         result = MagicMock()
         result.index.return_value = 0  # SUCCESS
         assert Exporter._is_success_status(result) is True
@@ -253,7 +253,7 @@ class TestExporter:
         # Setup
         mock_file = MagicMock()
         mock_gimp.file_save = MagicMock(return_value=True)
-        
+
         # Execute
         result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
 
@@ -276,7 +276,7 @@ class TestExporter:
         mock_file = MagicMock()
         mock_gimp.file_save = MagicMock(side_effect=Exception("Not available"))
         mock_gimp.file_export = MagicMock(return_value=True)
-        
+
         # Execute
         result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
 
@@ -300,7 +300,7 @@ class TestExporter:
         # Remove both save methods
         del mock_gimp.file_save
         del mock_gimp.file_export
-        
+
         # Execute
         result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)
 

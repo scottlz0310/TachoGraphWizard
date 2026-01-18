@@ -96,6 +96,8 @@ ignore = [
     "PLR0912", # Too many branches (GIMP compatibility code inherently complex)
     "PLR0915", # Too many statements (GIMP compatibility code inherently complex)
     "SIM102",  # Use single if statement (readability preference)
+    "SIM108",  # Use ternary operator (sometimes if-else is clearer with comments)
+    "SLF001",  # Private member access (OK in tests for testing private methods)
     "EXE001",  # Shebang present but not executable (needed for GIMP plugin on Windows)
     "COM812",  # Trailing comma missing (conflicts with formatter)
 ]

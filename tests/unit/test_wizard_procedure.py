@@ -46,17 +46,16 @@ class TestWizardProcedureSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test _get_settings_path uses APPDATA on Windows."""
-        from pathlib import Path as RealPath
         from tachograph_wizard.procedures.wizard_procedure import _get_settings_path
 
         # Mock Path to return a testable result
         mock_path_instance = MagicMock()
-        mock_path_instance.__truediv__ = lambda self, other: mock_path_instance
-        mock_path_instance.__str__ = lambda self: "C:/Users/Test/AppData/tachograph_wizard/settings.json"
+        mock_path_instance.__truediv__ = lambda _self, _other: mock_path_instance
+        mock_path_instance.__str__ = lambda _self: "C:/Users/Test/AppData/tachograph_wizard/settings.json"
         mock_path.return_value = mock_path_instance
 
-        result = _get_settings_path()
-        
+        _get_settings_path()
+
         # Verify Path was called with APPDATA value
         mock_path.assert_called_once_with("C:\\Users\\Test\\AppData")
 
@@ -85,7 +84,7 @@ class TestWizardProcedureSettings:
         settings_dir.mkdir()
         saved_dir = tmp_path / "saved"
         saved_dir.mkdir()
-        
+
         settings_file = settings_dir / "settings.json"
         settings_file.write_text(json.dumps({"wizard_last_output_dir": str(saved_dir)}))
 
@@ -268,7 +267,9 @@ class TestWizardProcedureSettings:
         output_dir.mkdir()
 
         # Mock _get_settings_path and mkdir to raise PermissionError
-        with patch("tachograph_wizard.procedures.wizard_procedure._get_settings_path", return_value=settings_file):
-            with patch.object(Path, "mkdir", side_effect=PermissionError("No permission")):
-                # Should not raise an exception
-                _save_last_output_dir(output_dir)
+        with (
+            patch("tachograph_wizard.procedures.wizard_procedure._get_settings_path", return_value=settings_file),
+            patch.object(Path, "mkdir", side_effect=PermissionError("No permission")),
+        ):
+            # Should not raise an exception
+            _save_last_output_dir(output_dir)
