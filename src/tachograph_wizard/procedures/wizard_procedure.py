@@ -8,6 +8,8 @@ this to a full GtkAssistant-based wizard.
 from __future__ import annotations
 
 import datetime
+import json
+import os
 from pathlib import Path
 
 import gi
@@ -17,6 +19,49 @@ gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gimp, GimpUi, Gtk
+
+
+def _get_settings_path() -> Path:
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "tachograph_wizard" / "settings.json"
+
+
+def _load_last_output_dir(default_dir: Path) -> Path:
+    settings_path = _get_settings_path()
+    try:
+        with settings_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        value = data.get("wizard_last_output_dir")
+        if value:
+            candidate = Path(value)
+            if candidate.exists():
+                return candidate
+    except FileNotFoundError:
+        return default_dir
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return default_dir
+    return default_dir
+
+
+def _save_last_output_dir(selected_dir: Path) -> None:
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data["wizard_last_output_dir"] = str(selected_dir)
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception:
+        return
 
 
 def run_wizard_dialog(
@@ -269,8 +314,9 @@ class TachographSimpleDialog(GimpUi.Dialog):
             title="Select Output Directory",
             action=Gtk.FileChooserAction.SELECT_FOLDER,
         )
-        # Set default to user's home directory
-        self.output_dir_button.set_current_folder(str(Path.home()))
+        # Set default to last used output directory
+        default_dir = _load_last_output_dir(Path.home())
+        self.output_dir_button.set_current_folder(str(default_dir))
         dir_box.pack_start(self.output_dir_button, True, True, 0)
 
         box.pack_start(dir_box, False, False, 0)
@@ -370,6 +416,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
                 return
 
             output_dir = Path(output_dir_path)
+            _save_last_output_dir(output_dir)
 
             for i, img in enumerate(self.split_images, start=1):
                 # Generate filename
