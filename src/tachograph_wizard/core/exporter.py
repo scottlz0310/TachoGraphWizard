@@ -66,6 +66,7 @@ class Exporter:
                 if Exporter._is_success_status(result):
                     return True
             except Exception:
+                # Gimp.file_save may not be available or may fail; try next fallback
                 pass
 
         export_fn = getattr(Gimp, "file_export", None)
@@ -80,6 +81,7 @@ class Exporter:
                 if Exporter._is_success_status(result):
                     return True
             except Exception:
+                # Gimp.file_export may not be available or may fail; continue
                 pass
 
         return False
@@ -132,8 +134,12 @@ class Exporter:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Flatten or merge layers
-        # Merge visible layers while preserving transparency
-        merged_drawable = image.flatten() if flatten else image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
+        if flatten:
+            # Flatten image; this may not preserve existing transparency depending on image mode
+            merged_drawable = image.flatten()
+        else:
+            # Merge visible layers while preserving transparency
+            merged_drawable = image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
 
         # Create Gio.File for the output path
         # IMPORTANT: Use forward slashes for cross-platform compatibility
