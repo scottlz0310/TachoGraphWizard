@@ -23,6 +23,68 @@ class Exporter:
     """Export processed images to PNG with alpha channel."""
 
     @staticmethod
+    def _is_success_status(result: object) -> bool:
+        if result is None:
+            return False
+        if isinstance(result, bool):
+            return result
+        try:
+            success_value = int(Gimp.PDBStatusType.SUCCESS)
+        except Exception:
+            success_value = Gimp.PDBStatusType.SUCCESS
+
+        if isinstance(result, int):
+            return result == success_value
+
+        if isinstance(result, (list, tuple)) and result:
+            return Exporter._is_success_status(result[0])
+
+        index = getattr(result, "index", None)
+        if callable(index):
+            try:
+                return index(0) == Gimp.PDBStatusType.SUCCESS
+            except Exception:
+                return False
+
+        return False
+
+    @staticmethod
+    def _try_file_api_save(
+        image: Gimp.Image,
+        drawables_list: list[Gimp.Drawable],
+        file: Gio.File,
+    ) -> bool:
+        save_fn = getattr(Gimp, "file_save", None)
+        if callable(save_fn):
+            try:
+                result = save_fn(
+                    Gimp.RunMode.NONINTERACTIVE,
+                    image,
+                    drawables_list,
+                    file,
+                )
+                if Exporter._is_success_status(result):
+                    return True
+            except Exception:
+                pass
+
+        export_fn = getattr(Gimp, "file_export", None)
+        if callable(export_fn):
+            try:
+                result = export_fn(
+                    Gimp.RunMode.NONINTERACTIVE,
+                    image,
+                    drawables_list,
+                    file,
+                )
+                if Exporter._is_success_status(result):
+                    return True
+            except Exception:
+                pass
+
+        return False
+
+    @staticmethod
     def _get_fallback_drawable(image: Gimp.Image) -> Gimp.Drawable | None:
         active_getters = ("get_active_drawable", "get_active_layer")
         for method_name in active_getters:
@@ -115,24 +177,31 @@ class Exporter:
                 if not drawable.has_alpha():
                     drawable.add_alpha()
 
-            result = run_pdb_procedure(
-                "file-png-save",
-                [
-                    GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
-                    GObject.Value(Gimp.Image, image),
-                    GObject.Value(GObject.TYPE_INT, num_drawables),
-                    Gimp.ValueArray.new_from_values(
-                        [GObject.Value(Gimp.Drawable, d) for d in drawables_list],
-                    ),
-                    GObject.Value(Gio.File, file),
-                ],
-            )
+            if Exporter._try_file_api_save(image, drawables_list, file):
+                return True
 
-            if result.index(0) != Gimp.PDBStatusType.SUCCESS:
-                msg = f"Failed to save PNG: {output_path}"
-                raise RuntimeError(msg)
+            last_error: Exception | None = None
+            for proc_name in ("file-png-save", "file-png-export"):
+                try:
+                    result = run_pdb_procedure(
+                        proc_name,
+                        [
+                            GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
+                            GObject.Value(Gimp.Image, image),
+                            GObject.Value(GObject.TYPE_INT, num_drawables),
+                            Gimp.ValueArray.new_from_values(
+                                [GObject.Value(Gimp.Drawable, d) for d in drawables_list],
+                            ),
+                            GObject.Value(Gio.File, file),
+                        ],
+                    )
+                    if Exporter._is_success_status(result):
+                        return True
+                except Exception as e:
+                    last_error = e
 
-            return True
+            msg = f"Failed to save PNG: {output_path}"
+            raise RuntimeError(msg) from last_error
 
         except Exception as e:
             msg = f"Error saving PNG: {e}"
