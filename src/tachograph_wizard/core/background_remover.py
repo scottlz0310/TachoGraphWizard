@@ -772,6 +772,43 @@ class BackgroundRemover:
         _debug_log("auto_cleanup_and_crop completed")
 
     @staticmethod
+    def add_center_guides(image: Gimp.Image) -> None:
+        """Add horizontal and vertical guides at 50% position.
+
+        Adds guides at the center of the image to assist with
+        rotation alignment in GIMP's arbitrary rotation tool.
+
+        Args:
+            image: Target image to add guides to.
+        """
+        _debug_log("add_center_guides called")
+
+        width = image.get_width()
+        height = image.get_height()
+
+        # Calculate 50% positions
+        center_x = width // 2
+        center_y = height // 2
+
+        _debug_log(f"Image size: {width}x{height}, center: ({center_x}, {center_y})")
+
+        # Add vertical guide at 50% horizontal position
+        try:
+            image.add_vguide(center_x)
+            _debug_log(f"Added vertical guide at x={center_x}")
+        except Exception as e:
+            _debug_log(f"Failed to add vertical guide: {e}")
+
+        # Add horizontal guide at 50% vertical position
+        try:
+            image.add_hguide(center_y)
+            _debug_log(f"Added horizontal guide at y={center_y}")
+        except Exception as e:
+            _debug_log(f"Failed to add horizontal guide: {e}")
+
+        _debug_log("add_center_guides completed")
+
+    @staticmethod
     def process_background(
         drawable: Gimp.Drawable,
         ellipse_padding: int = 20,
@@ -783,7 +820,8 @@ class BackgroundRemover:
         """Complete background removal process using ellipse selection.
 
         Creates an ellipse selection based on padding, inverts it, and deletes
-        everything outside the disc area.
+        everything outside the disc area. After cleanup, adds center guides
+        at 50% position to assist with rotation alignment.
 
         Args:
             drawable: Target drawable (layer) to process.
@@ -797,5 +835,9 @@ class BackgroundRemover:
 
         # Use ellipse-based cleanup method
         BackgroundRemover.auto_cleanup_and_crop(drawable, ellipse_padding=ellipse_padding)
+
+        # Add center guides for rotation assist
+        image = drawable.get_image()
+        BackgroundRemover.add_center_guides(image)
 
         _debug_log("process_background completed")
