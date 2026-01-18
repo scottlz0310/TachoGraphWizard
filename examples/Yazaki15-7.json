@@ -1,0 +1,111 @@
+{
+  "name": "Yazaki120-1",
+  "version": "1.0",
+  "description": "\u9664\u96ea\u30c8\u30e9\u30c3\u30af\u7cfb-1",
+  "reference_width": 1452,
+  "reference_height": 1448,
+  "fields": {
+    "date_day": {
+      "position": {
+        "x_ratio": 0.41597796143250687,
+        "y_ratio": 0.47997237569060774
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    },
+    "date_month": {
+      "position": {
+        "x_ratio": 0.38705234159779617,
+        "y_ratio": 0.47997237569060774
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    },
+    "date_year": {
+      "position": {
+        "x_ratio": 0.3409090909090909,
+        "y_ratio": 0.47997237569060774
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    },
+    "driver": {
+      "position": {
+        "x_ratio": 0.4786501377410468,
+        "y_ratio": 0.3736187845303867
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    },
+    "vehicle_no": {
+      "position": {
+        "x_ratio": 0.5922865013774105,
+        "y_ratio": 0.48273480662983426
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    },
+    "vehicle_type": {
+      "position": {
+        "x_ratio": 0.4793388429752066,
+        "y_ratio": 0.40124309392265195
+      },
+      "font": {
+        "family": "Sans-serif",
+        "size_ratio": 0.02,
+        "color": "#000000",
+        "bold": false,
+        "italic": false
+      },
+      "align": "left",
+      "vertical_align": "top",
+      "visible": true,
+      "required": false
+    }
+  }
+}
