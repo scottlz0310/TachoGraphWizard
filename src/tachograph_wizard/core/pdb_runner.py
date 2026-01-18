@@ -168,7 +168,7 @@ def _populate_config(config: Any, values: Sequence[Any]) -> None:
                                 break
                 if file_uri:
                     for cand in ("uri",):
-                         if (not prop_names) or (cand in prop_names):
+                        if (not prop_names) or (cand in prop_names):
                             if _set_config_property(config, cand, file_uri):
                                 break
                 continue

@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """Unit tests for the Exporter module."""
 
 from __future__ import annotations
@@ -297,9 +298,9 @@ class TestExporter:
 
         # Setup
         mock_file = MagicMock()
-        # Remove both save methods
-        del mock_gimp.file_save
-        del mock_gimp.file_export
+        # Simulate missing save APIs
+        mock_gimp.file_save = None
+        mock_gimp.file_export = None
 
         # Execute
         result = Exporter._try_file_api_save(mock_image, [mock_drawable], mock_file)

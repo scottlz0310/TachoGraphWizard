@@ -1,9 +1,10 @@
+# pyright: reportPrivateUsage=false
 """Unit tests for wizard_procedure settings functions."""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import MagicMock, patch
 
 
@@ -39,25 +40,17 @@ class TestWizardProcedureSettings:
 
     @patch("tachograph_wizard.procedures.wizard_procedure.os.name", "nt")
     @patch("tachograph_wizard.procedures.wizard_procedure.os.environ", {"APPDATA": "C:\\Users\\Test\\AppData"})
-    @patch("tachograph_wizard.procedures.wizard_procedure.Path")
     def test_get_settings_path_windows_appdata(
         self,
-        mock_path: MagicMock,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test _get_settings_path uses APPDATA on Windows."""
         from tachograph_wizard.procedures.wizard_procedure import _get_settings_path
 
-        # Mock Path to return a testable result
-        mock_path_instance = MagicMock()
-        mock_path_instance.__truediv__ = lambda _self, _other: mock_path_instance
-        mock_path_instance.__str__ = lambda _self: "C:/Users/Test/AppData/tachograph_wizard/settings.json"
-        mock_path.return_value = mock_path_instance
+        with patch("tachograph_wizard.procedures.wizard_procedure.Path", PureWindowsPath):
+            result = _get_settings_path()
 
-        _get_settings_path()
-
-        # Verify Path was called with APPDATA value
-        mock_path.assert_called_once_with("C:\\Users\\Test\\AppData")
+        assert str(result) == "C:\\Users\\Test\\AppData\\tachograph_wizard\\settings.json"
 
     def test_load_last_output_dir_file_not_found(
         self,

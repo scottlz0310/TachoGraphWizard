@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """Unit tests for pdb_runner integer and Gio.File handling."""
 
 from __future__ import annotations
