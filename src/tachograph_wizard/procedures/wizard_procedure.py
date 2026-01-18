@@ -34,6 +34,8 @@ def _load_last_output_dir(default_dir: Path) -> Path:
     try:
         with settings_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
+        if not isinstance(data, dict):
+            return default_dir
         value = data.get("wizard_last_output_dir")
         if value:
             candidate = Path(value)
@@ -41,7 +43,7 @@ def _load_last_output_dir(default_dir: Path) -> Path:
                 return candidate
     except FileNotFoundError:
         return default_dir
-    except (json.JSONDecodeError, TypeError, ValueError):
+    except (json.JSONDecodeError, TypeError, ValueError, AttributeError, OSError):
         return default_dir
     return default_dir
 
@@ -54,8 +56,11 @@ def _save_last_output_dir(selected_dir: Path) -> None:
         if settings_path.exists():
             try:
                 with settings_path.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
+                    loaded_data = json.load(handle)
+                # Validate that loaded data is a dict before using it
+                if isinstance(loaded_data, dict):
+                    data = loaded_data
+            except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
                 data = {}
         data["wizard_last_output_dir"] = str(selected_dir)
         with settings_path.open("w", encoding="utf-8") as handle:
