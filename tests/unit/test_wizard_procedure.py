@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from unittest.mock import MagicMock, patch
 
 
@@ -20,22 +20,26 @@ class TestWizardProcedureSettings:
         """Test _get_settings_path uses XDG_CONFIG_HOME on Linux."""
         from tachograph_wizard.procedures.wizard_procedure import _get_settings_path
 
-        result = _get_settings_path()
+        with patch("tachograph_wizard.procedures.wizard_procedure.Path", PurePosixPath):
+            result = _get_settings_path()
         assert str(result) == "/test/config/tachograph_wizard/settings.json"
 
     @patch("tachograph_wizard.procedures.wizard_procedure.os.name", "posix")
     @patch("tachograph_wizard.procedures.wizard_procedure.os.environ", {})
-    @patch("tachograph_wizard.procedures.wizard_procedure.Path.home")
     def test_get_settings_path_home_config(
         self,
-        mock_home: MagicMock,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test _get_settings_path falls back to ~/.config on Linux."""
         from tachograph_wizard.procedures.wizard_procedure import _get_settings_path
 
-        mock_home.return_value = Path("/home/user")
-        result = _get_settings_path()
+        class _FakePosixPath(PurePosixPath):
+            @classmethod
+            def home(cls) -> _FakePosixPath:
+                return cls("/home/user")
+
+        with patch("tachograph_wizard.procedures.wizard_procedure.Path", _FakePosixPath):
+            result = _get_settings_path()
         assert str(result) == "/home/user/.config/tachograph_wizard/settings.json"
 
     @patch("tachograph_wizard.procedures.wizard_procedure.os.name", "nt")
@@ -61,8 +65,10 @@ class TestWizardProcedureSettings:
         from tachograph_wizard.procedures.wizard_procedure import _load_last_output_dir
 
         default_dir = tmp_path / "default"
-        result = _load_last_output_dir(default_dir)
-        assert result == default_dir
+        settings_file = tmp_path / "settings.json"
+        with patch("tachograph_wizard.procedures.wizard_procedure._get_settings_path", return_value=settings_file):
+            result = _load_last_output_dir(default_dir)
+            assert result == default_dir
 
     def test_load_last_output_dir_valid_json(
         self,
