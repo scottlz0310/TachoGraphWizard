@@ -68,6 +68,17 @@ class Exporter:
         try:
             # Get all drawables to export
             num_drawables, drawables = image.get_selected_drawables()
+            if (not drawables) or (num_drawables <= 0):
+                drawable = image.get_active_drawable()
+                if drawable is None:
+                    layers = image.get_layers()
+                    if layers:
+                        drawable = layers[0]
+                if drawable is None:
+                    msg = "No drawable available for PNG export"
+                    raise RuntimeError(msg)
+                drawables = [drawable]
+                num_drawables = 1
 
             result = run_pdb_procedure(
                 "file-png-save",

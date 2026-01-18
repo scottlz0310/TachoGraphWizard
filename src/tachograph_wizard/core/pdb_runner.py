@@ -15,8 +15,9 @@ from typing import Any
 import gi
 
 gi.require_version("Gimp", "3.0")
+gi.require_version("Gio", "2.0")
 
-from gi.repository import Gimp
+from gi.repository import Gio, Gimp
 
 
 def _make_value_array(values: Sequence[Any]) -> Any | None:
@@ -135,6 +136,49 @@ def _populate_config(config: Any, values: Sequence[Any]) -> None:
         try:
             if isinstance(v, Gimp.ValueArray):
                 for cand in ("drawables", "value-array", "values"):
+                    if (not prop_names) or (cand in prop_names):
+                        if _set_config_property(config, cand, v):
+                            break
+                continue
+        except Exception:
+            pass
+
+        # Gio.File (save/load paths)
+        try:
+            if isinstance(v, Gio.File):
+                if (not prop_names) or ("file" in prop_names):
+                    if _set_config_property(config, "file", v):
+                        continue
+
+                file_path = None
+                file_uri = None
+                try:
+                    file_path = v.get_path()
+                except Exception:
+                    file_path = None
+                try:
+                    file_uri = v.get_uri()
+                except Exception:
+                    file_uri = None
+
+                if file_path:
+                    for cand in ("filename", "path"):
+                        if (not prop_names) or (cand in prop_names):
+                            if _set_config_property(config, cand, file_path):
+                                break
+                if file_uri:
+                    for cand in ("uri",):
+                        if (not prop_names) or (cand in prop_names):
+                            if _set_config_property(config, cand, file_uri):
+                                break
+                continue
+        except Exception:
+            pass
+
+        # Integer counts (e.g. num-drawables)
+        try:
+            if isinstance(v, int):
+                for cand in ("num-drawables", "n-drawables", "num_drawables", "n_drawables"):
                     if (not prop_names) or (cand in prop_names):
                         if _set_config_property(config, cand, v):
                             break
