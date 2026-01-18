@@ -409,7 +409,7 @@ class BackgroundRemover:
                 full_rect.width = width
                 full_rect.height = height
 
-                pixel_data = ImageSplitter._buffer_get_bytes(buffer, full_rect, 1.0, "R'G'B'A u8")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                pixel_data = ImageSplitter._buffer_get_bytes(buffer, full_rect, 1.0, "R'G'B'A u8")  # pyright: ignore[reportPrivateUsage]
 
                 if pixel_data:
                     # Manual threshold: convert to bytearray for modification
@@ -696,10 +696,10 @@ class BackgroundRemover:
             rect.height = height
 
             # Read current pixels (RGBA)
-            pixel_data = ImageSplitter._buffer_get_bytes(buffer, rect, 1.0, "R'G'B'A u8")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            pixel_data = ImageSplitter._buffer_get_bytes(buffer, rect, 1.0, "R'G'B'A u8")  # pyright: ignore[reportPrivateUsage]
 
             # Read selection mask (single channel, 0-255)
-            selection_data = ImageSplitter._buffer_get_bytes(selection_buffer, rect, 1.0, "Y u8")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            selection_data = ImageSplitter._buffer_get_bytes(selection_buffer, rect, 1.0, "Y u8")  # pyright: ignore[reportPrivateUsage]
 
             if pixel_data and selection_data:
                 pixels = bytearray(pixel_data)

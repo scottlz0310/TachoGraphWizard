@@ -23,6 +23,94 @@ class Exporter:
     """Export processed images to PNG with alpha channel."""
 
     @staticmethod
+    def _is_success_status(result: object) -> bool:
+        if result is None:
+            return False
+        if isinstance(result, bool):
+            return result
+        try:
+            success_value = int(Gimp.PDBStatusType.SUCCESS)
+        except Exception:
+            success_value = Gimp.PDBStatusType.SUCCESS
+
+        if isinstance(result, int):
+            return result == success_value
+
+        if isinstance(result, (list, tuple)) and result:
+            return Exporter._is_success_status(result[0])
+
+        index = getattr(result, "index", None)
+        if callable(index):
+            try:
+                return index(0) == Gimp.PDBStatusType.SUCCESS
+            except Exception:
+                return False
+
+        return False
+
+    @staticmethod
+    def _try_file_api_save(
+        image: Gimp.Image,
+        drawables_list: list[Gimp.Drawable],
+        file: Gio.File,
+    ) -> bool:
+        save_fn = getattr(Gimp, "file_save", None)
+        if callable(save_fn):
+            try:
+                result = save_fn(
+                    Gimp.RunMode.NONINTERACTIVE,
+                    image,
+                    drawables_list,
+                    file,
+                )
+                if Exporter._is_success_status(result):
+                    return True
+            except Exception:
+                # Gimp.file_save may not be available or may fail; try next fallback
+                pass
+
+        export_fn = getattr(Gimp, "file_export", None)
+        if callable(export_fn):
+            try:
+                result = export_fn(
+                    Gimp.RunMode.NONINTERACTIVE,
+                    image,
+                    drawables_list,
+                    file,
+                )
+                if Exporter._is_success_status(result):
+                    return True
+            except Exception:
+                # Gimp.file_export may not be available or may fail; continue
+                pass
+
+        return False
+
+    @staticmethod
+    def _get_fallback_drawable(image: Gimp.Image) -> Gimp.Drawable | None:
+        active_getters = ("get_active_drawable", "get_active_layer")
+        for method_name in active_getters:
+            getter = getattr(image, method_name, None)
+            if callable(getter):
+                try:
+                    drawable = getter()
+                except Exception:
+                    drawable = None
+                if drawable is not None:
+                    return drawable
+
+        layers_getter = getattr(image, "get_layers", None)
+        if callable(layers_getter):
+            try:
+                layers = layers_getter()
+            except Exception:
+                layers = None
+            if isinstance(layers, (list, tuple)) and layers:
+                return layers[0]
+
+        return None
+
+    @staticmethod
     def save_png(
         image: Gimp.Image,
         output_path: Path,
@@ -47,17 +135,11 @@ class Exporter:
 
         # Flatten or merge layers
         if flatten:
-            image.flatten()
+            # Flatten image; this may not preserve existing transparency depending on image mode
+            merged_drawable = image.flatten()
         else:
             # Merge visible layers while preserving transparency
-            image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
-
-        # Get the active drawable (layer)
-        drawable = image.get_active_drawable()
-
-        # Ensure alpha channel exists
-        if not drawable.has_alpha():
-            drawable.add_alpha()
+            merged_drawable = image.merge_visible_layers(Gimp.MergeType.EXPAND_AS_NECESSARY)
 
         # Create Gio.File for the output path
         # IMPORTANT: Use forward slashes for cross-platform compatibility
@@ -67,26 +149,65 @@ class Exporter:
         # Save as PNG using GIMP 3 file save procedure
         try:
             # Get all drawables to export
-            num_drawables, drawables = image.get_selected_drawables()
+            get_selected_drawables = getattr(image, "get_selected_drawables", None)
+            if callable(get_selected_drawables):
+                result = get_selected_drawables()
+                if isinstance(result, tuple) and len(result) == 2:
+                    num_drawables, drawables = result
+                else:
+                    num_drawables, drawables = 0, []
+            else:
+                num_drawables, drawables = 0, []
 
-            result = run_pdb_procedure(
-                "file-png-save",
-                [
-                    GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
-                    GObject.Value(Gimp.Image, image),
-                    GObject.Value(GObject.TYPE_INT, num_drawables),
-                    Gimp.ValueArray.new_from_values(
-                        [GObject.Value(Gimp.Drawable, d) for d in drawables],
-                    ),
-                    GObject.Value(Gio.File, file),
-                ],
-            )
+            drawables_list: list[Gimp.Drawable] = []
+            if isinstance(drawables, (list, tuple)):
+                drawables_list = list(drawables)
+            elif drawables:
+                drawables_list = [drawables]
 
-            if result.index(0) != Gimp.PDBStatusType.SUCCESS:
-                msg = f"Failed to save PNG: {output_path}"
-                raise RuntimeError(msg)
+            try:
+                num_drawables = int(num_drawables)
+            except Exception:
+                num_drawables = len(drawables_list)
 
-            return True
+            if (not drawables_list) or (num_drawables <= 0):
+                drawable = merged_drawable or Exporter._get_fallback_drawable(image)
+                if drawable is None:
+                    msg = "No drawable available for PNG export"
+                    raise RuntimeError(msg)
+                drawables_list = [drawable]
+                num_drawables = 1
+
+            # Ensure alpha channel exists
+            for drawable in drawables_list:
+                if not drawable.has_alpha():
+                    drawable.add_alpha()
+
+            if Exporter._try_file_api_save(image, drawables_list, file):
+                return True
+
+            last_error: Exception | None = None
+            for proc_name in ("file-png-save", "file-png-export"):
+                try:
+                    result = run_pdb_procedure(
+                        proc_name,
+                        [
+                            GObject.Value(Gimp.RunMode, Gimp.RunMode.NONINTERACTIVE),
+                            GObject.Value(Gimp.Image, image),
+                            GObject.Value(GObject.TYPE_INT, num_drawables),
+                            Gimp.ValueArray.new_from_values(
+                                [GObject.Value(Gimp.Drawable, d) for d in drawables_list],
+                            ),
+                            GObject.Value(Gio.File, file),
+                        ],
+                    )
+                    if Exporter._is_success_status(result):
+                        return True
+                except Exception as e:
+                    last_error = e
+
+            msg = f"Failed to save PNG: {output_path}"
+            raise RuntimeError(msg) from last_error
 
         except Exception as e:
             msg = f"Error saving PNG: {e}"

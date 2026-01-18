@@ -15,8 +15,9 @@ from typing import Any
 import gi
 
 gi.require_version("Gimp", "3.0")
+gi.require_version("Gio", "2.0")
 
-from gi.repository import Gimp
+from gi.repository import Gimp, Gio
 
 
 def _make_value_array(values: Sequence[Any]) -> Any | None:
@@ -84,7 +85,7 @@ def _populate_config(config: Any, values: Sequence[Any]) -> None:
     prop_names = set(_list_property_names(config))
 
     # Unwrap and map values by heuristic.
-    for raw in values:
+    for idx, raw in enumerate(values):
         v = _unwrap_gvalue(raw)
 
         # Run mode
@@ -140,6 +141,63 @@ def _populate_config(config: Any, values: Sequence[Any]) -> None:
                             break
                 continue
         except Exception:
+            pass
+
+        # Gio.File (save/load paths)
+        try:
+            if isinstance(v, Gio.File):
+                if (not prop_names) or ("file" in prop_names):
+                    if _set_config_property(config, "file", v):
+                        continue
+
+                file_path = None
+                file_uri = None
+                try:
+                    file_path = v.get_path()
+                except Exception:
+                    file_path = None
+                try:
+                    file_uri = v.get_uri()
+                except Exception:
+                    file_uri = None
+
+                if file_path:
+                    for cand in ("filename", "path"):
+                        if (not prop_names) or (cand in prop_names):
+                            if _set_config_property(config, cand, file_path):
+                                break
+                if file_uri:
+                    for cand in ("uri",):
+                        if (not prop_names) or (cand in prop_names):
+                            if _set_config_property(config, cand, file_uri):
+                                break
+                continue
+        except Exception:
+            # Best-effort heuristic: ignore Gio.File mapping failures and
+            # continue attempting to map remaining values
+            pass
+
+        # Integer counts (e.g. num-drawables)
+        # Only map integers to drawable count properties if next value is a ValueArray/Drawable
+        try:
+            if isinstance(v, int):
+                # Check if next value suggests this is a drawable count
+                next_is_drawable_related = False
+                if idx + 1 < len(values):
+                    next_val = _unwrap_gvalue(values[idx + 1])
+                    if isinstance(next_val, (Gimp.ValueArray, Gimp.Drawable)):
+                        next_is_drawable_related = True
+
+                # Only map to drawable count properties if context suggests it
+                if next_is_drawable_related:
+                    for cand in ("num-drawables", "n-drawables", "num_drawables", "n_drawables"):
+                        if (not prop_names) or (cand in prop_names):
+                            if _set_config_property(config, cand, v):
+                                break
+                continue
+        except Exception:
+            # Best-effort heuristic: ignore integer mapping failures and
+            # continue attempting to map remaining values
             pass
 
 
