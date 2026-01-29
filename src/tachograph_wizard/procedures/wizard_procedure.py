@@ -7,8 +7,6 @@ this to a full GtkAssistant-based wizard.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import gi
 
 gi.require_version("Gimp", "3.0")
