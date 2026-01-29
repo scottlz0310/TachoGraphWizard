@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+from typing import ClassVar
 
 import gi
 
@@ -16,6 +17,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gimp, GimpUi, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
+from tachograph_wizard.core.exporter import Exporter
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_renderer import TextRenderer
 
@@ -124,6 +126,80 @@ def _save_template_dir(selected_dir: Path) -> None:
         _debug_log(f"WARNING: Failed to save settings: {exc}")
 
 
+def _load_csv_path() -> Path | None:
+    """Load the last used CSV file path from settings."""
+    settings_path = _get_settings_path()
+    try:
+        with settings_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        value = data.get("text_inserter_csv_path")
+        if value:
+            candidate = Path(value)
+            if candidate.exists():
+                return candidate
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        _debug_log(f"WARNING: Failed to read settings: {exc}")
+    return None
+
+
+def _save_csv_path(csv_path: Path) -> None:
+    """Save the CSV file path to settings."""
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data["text_inserter_csv_path"] = str(csv_path)
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception as exc:
+        _debug_log(f"WARNING: Failed to save settings: {exc}")
+
+
+def _load_output_dir() -> Path | None:
+    """Load the last used output directory from settings."""
+    settings_path = _get_settings_path()
+    try:
+        with settings_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        value = data.get("text_inserter_output_dir")
+        if value:
+            candidate = Path(value)
+            if candidate.exists():
+                return candidate
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        _debug_log(f"WARNING: Failed to read settings: {exc}")
+    return None
+
+
+def _save_output_dir(output_dir: Path) -> None:
+    """Save the output directory to settings."""
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data["text_inserter_output_dir"] = str(output_dir)
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception as exc:
+        _debug_log(f"WARNING: Failed to save settings: {exc}")
+
+
 def _parse_date_string(value: str) -> datetime.date | None:
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
         try:
@@ -135,6 +211,13 @@ def _parse_date_string(value: str) -> datetime.date | None:
 
 class TextInserterDialog(GimpUi.Dialog):
     """Dialog for inserting text from CSV files using templates."""
+
+    # Available filename fields for user selection
+    FILENAME_FIELD_OPTIONS: ClassVar[list[tuple[str, str]]] = [
+        ("date", "Date (from calendar)"),
+        ("vehicle_no", "Vehicle Number"),
+        ("driver_name", "Driver Name"),
+    ]
 
     def __init__(self, image: Gimp.Image) -> None:
         """Initialize the dialog.
@@ -155,9 +238,12 @@ class TextInserterDialog(GimpUi.Dialog):
         self.csv_data: list[dict[str, str]] = []
         self.current_row_index = 0
         self.default_date = _load_last_used_date() or datetime.date.today()
+        self.last_csv_path = _load_csv_path()
+        self.output_dir = _load_output_dir() or Path.home()
+        self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
 
         # Set dialog properties
-        self.set_default_size(500, 400)
+        self.set_default_size(500, 600)
         self.set_border_width(12)
 
         # Add action buttons
@@ -172,38 +258,53 @@ class TextInserterDialog(GimpUi.Dialog):
         content_area = self.get_content_area()
         content_area.set_spacing(12)
 
+        # Create a scrolled window for the entire content
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_min_content_height(500)
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        main_box.set_border_width(6)
+
         # Welcome label
         welcome_label = Gtk.Label()
         welcome_label.set_markup(
             "<b>Tachograph Text Inserter</b>\n\nInsert text from CSV files using templates.",
         )
         welcome_label.set_line_wrap(True)
-        content_area.pack_start(welcome_label, False, False, 0)
+        main_box.pack_start(welcome_label, False, False, 0)
 
         # Template selection section
         template_frame = self._create_template_section()
-        content_area.pack_start(template_frame, False, False, 0)
+        main_box.pack_start(template_frame, False, False, 0)
 
         # CSV file selection section
         csv_frame = self._create_csv_section()
-        content_area.pack_start(csv_frame, False, False, 0)
+        main_box.pack_start(csv_frame, False, False, 0)
 
         # Date selection section
         date_frame = self._create_date_section()
-        content_area.pack_start(date_frame, False, False, 0)
+        main_box.pack_start(date_frame, False, False, 0)
 
         # Row selection section
         row_frame = self._create_row_section()
-        content_area.pack_start(row_frame, False, False, 0)
+        main_box.pack_start(row_frame, False, False, 0)
 
         # Preview section
         preview_frame = self._create_preview_section()
-        content_area.pack_start(preview_frame, True, True, 0)
+        main_box.pack_start(preview_frame, False, False, 0)
 
         # Insert button
         insert_button = Gtk.Button(label="Insert Text")
         insert_button.connect("clicked", self._on_insert_clicked)
-        content_area.pack_start(insert_button, False, False, 0)
+        main_box.pack_start(insert_button, False, False, 0)
+
+        # Save section
+        save_frame = self._create_save_section()
+        main_box.pack_start(save_frame, False, False, 0)
+
+        scrolled_window.add(main_box)
+        content_area.pack_start(scrolled_window, True, True, 0)
 
         # Status label
         self.status_label = Gtk.Label()
@@ -288,6 +389,10 @@ class TextInserterDialog(GimpUi.Dialog):
         all_filter.add_pattern("*")
         self.csv_chooser.add_filter(all_filter)
 
+        # Pre-populate with last used CSV file if available
+        if self.last_csv_path and self.last_csv_path.exists():
+            self.csv_chooser.set_filename(str(self.last_csv_path))
+
         file_box.pack_start(self.csv_chooser, True, True, 0)
         box.pack_start(file_box, False, False, 0)
 
@@ -362,6 +467,63 @@ class TextInserterDialog(GimpUi.Dialog):
         scrolled.add(self.preview_text)
 
         box.pack_start(scrolled, True, True, 0)
+
+        return frame
+
+    def _create_save_section(self) -> Gtk.Frame:
+        """Create the save section with output folder and filename field selection."""
+        frame = Gtk.Frame(label="Step 6: Save Image")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_border_width(6)
+        frame.add(box)
+
+        # Output folder selection
+        folder_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        folder_label = Gtk.Label(label="Output Folder:")
+        folder_box.pack_start(folder_label, False, False, 0)
+
+        self.output_folder_button = Gtk.FileChooserButton(
+            title="Select Output Folder",
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        if self.output_dir.exists():
+            self.output_folder_button.set_current_folder(str(self.output_dir))
+        else:
+            self.output_folder_button.set_current_folder(str(Path.home()))
+        folder_box.pack_start(self.output_folder_button, True, True, 0)
+        box.pack_start(folder_box, False, False, 0)
+
+        # Filename field selection
+        fields_label = Gtk.Label()
+        fields_label.set_markup("<b>Select fields for filename:</b>")
+        fields_label.set_xalign(0.0)
+        box.pack_start(fields_label, False, False, 0)
+
+        fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
+            check = Gtk.CheckButton(label=field_label)
+            # Enable date by default
+            check.set_active(field_key == "date")
+            check.connect("toggled", self._on_filename_field_toggled)
+            self.filename_field_checks[field_key] = check
+            fields_box.pack_start(check, False, False, 0)
+        box.pack_start(fields_box, False, False, 0)
+
+        # Filename preview
+        preview_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        preview_label = Gtk.Label(label="Filename:")
+        preview_box.pack_start(preview_label, False, False, 0)
+
+        self.filename_preview_label = Gtk.Label()
+        self.filename_preview_label.set_xalign(0.0)
+        self.filename_preview_label.set_text("(load CSV to preview)")
+        preview_box.pack_start(self.filename_preview_label, True, True, 0)
+        box.pack_start(preview_box, False, False, 0)
+
+        # Save button
+        save_button = Gtk.Button(label="Save Image")
+        save_button.connect("clicked", self._on_save_clicked)
+        box.pack_start(save_button, False, False, 0)
 
         return frame
 
@@ -443,6 +605,7 @@ class TextInserterDialog(GimpUi.Dialog):
     def _on_date_changed(self, _calendar: Gtk.Calendar) -> None:
         """Handle date selection changes."""
         self._update_preview()
+        self._update_filename_preview()
 
     def _on_load_csv_clicked(self, button: Gtk.Button) -> None:
         """Handle load CSV button click."""
@@ -455,6 +618,10 @@ class TextInserterDialog(GimpUi.Dialog):
             csv_path = Path(csv_path_str)
             self.csv_data = CSVParser.parse(csv_path)
 
+            # Save the CSV path for future use
+            _save_csv_path(csv_path)
+            self.last_csv_path = csv_path
+
             # Update row spinner
             row_count = len(self.csv_data)
             self.row_adjustment.set_upper(row_count)
@@ -463,6 +630,9 @@ class TextInserterDialog(GimpUi.Dialog):
 
             # Update preview
             self._update_preview()
+
+            # Update filename preview
+            self._update_filename_preview()
 
             self.status_label.set_text(f"Loaded {row_count} rows from CSV")
 
@@ -473,6 +643,7 @@ class TextInserterDialog(GimpUi.Dialog):
         """Handle row spinner value change."""
         self.current_row_index = int(spinner.get_value()) - 1
         self._update_preview()
+        self._update_filename_preview()
 
     def _update_preview(self) -> None:
         """Update the preview text view."""
@@ -582,6 +753,95 @@ class TextInserterDialog(GimpUi.Dialog):
         except Exception as e:
             _debug_log(f"ERROR: Insert failed: {e}")
             self._show_error(f"Failed to insert text: {e}")
+
+    def _on_filename_field_toggled(self, check: Gtk.CheckButton) -> None:
+        """Handle filename field checkbox toggle."""
+        self._update_filename_preview()
+
+    def _get_selected_filename_fields(self) -> list[str]:
+        """Get the list of selected filename fields."""
+        return [key for key, check in self.filename_field_checks.items() if check.get_active()]
+
+    def _generate_filename_from_row(self, row_data: dict[str, str]) -> str:
+        """Generate filename based on selected fields and current row data.
+
+        Args:
+            row_data: The CSV row data dictionary.
+
+        Returns:
+            Generated filename string.
+        """
+        selected_fields = self._get_selected_filename_fields()
+        selected_date = self._get_selected_date()
+
+        return Exporter.generate_filename(
+            date=selected_date if "date" in selected_fields else None,
+            vehicle_number=row_data.get("vehicle_no", "") if "vehicle_no" in selected_fields else "",
+            driver_name=row_data.get("driver_name", "") if "driver_name" in selected_fields else "",
+        )
+
+    def _update_filename_preview(self) -> None:
+        """Update the filename preview label."""
+        if not hasattr(self, "filename_preview_label"):
+            return
+
+        if not self.csv_data or self.current_row_index >= len(self.csv_data):
+            self.filename_preview_label.set_text("(load CSV to preview)")
+            return
+
+        try:
+            row_data = self._build_row_data(
+                self.csv_data[self.current_row_index],
+                strict=False,
+            )
+            filename = self._generate_filename_from_row(row_data)
+            self.filename_preview_label.set_text(filename)
+        except Exception:
+            self.filename_preview_label.set_text("(unable to generate preview)")
+
+    def _on_save_clicked(self, button: Gtk.Button) -> None:
+        """Handle save button click."""
+        if not self.csv_data:
+            self._show_error("Please load a CSV file first")
+            return
+
+        if self.current_row_index >= len(self.csv_data):
+            self._show_error("Invalid row selected")
+            return
+
+        folder_path_str = self.output_folder_button.get_filename()
+        if not folder_path_str:
+            self._show_error("Please select an output folder")
+            return
+
+        try:
+            output_folder = Path(folder_path_str)
+            if not output_folder.exists():
+                output_folder.mkdir(parents=True, exist_ok=True)
+
+            # Save output directory for future use
+            _save_output_dir(output_folder)
+            self.output_dir = output_folder
+
+            # Build row data with date
+            row_data = self._build_row_data(
+                self.csv_data[self.current_row_index],
+                strict=True,
+            )
+
+            # Generate filename
+            filename = self._generate_filename_from_row(row_data)
+            output_path = output_folder / filename
+
+            # Save the image
+            Exporter.save_png(self.image, output_path, flatten=False)
+
+            _save_last_used_date(self._get_selected_date())
+            self.status_label.set_text(f"Saved: {output_path}")
+
+        except Exception as e:
+            _debug_log(f"ERROR: Save failed: {e}")
+            self._show_error(f"Failed to save image: {e}")
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.
