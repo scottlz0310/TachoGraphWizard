@@ -23,7 +23,7 @@ class TestTextInserterDialogSettings:
         from tachograph_wizard.ui.text_inserter_dialog import _load_csv_path
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
             result = _load_csv_path()
@@ -50,7 +50,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_csv_path()
@@ -73,7 +73,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_csv_path()
@@ -92,7 +92,7 @@ class TestTextInserterDialogSettings:
         csv_path = tmp_path / "test.csv"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_csv_path(csv_path)
@@ -117,7 +117,7 @@ class TestTextInserterDialogSettings:
         csv_path = tmp_path / "test.csv"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_csv_path(csv_path)
@@ -135,7 +135,7 @@ class TestTextInserterDialogSettings:
         from tachograph_wizard.ui.text_inserter_dialog import _load_output_dir
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
             result = _load_output_dir()
@@ -162,7 +162,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_output_dir()
@@ -185,7 +185,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_output_dir()
@@ -204,7 +204,7 @@ class TestTextInserterDialogSettings:
         output_dir = tmp_path / "output"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_output_dir(output_dir)
@@ -229,7 +229,7 @@ class TestTextInserterDialogSettings:
         output_dir = tmp_path / "output"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_output_dir(output_dir)
@@ -247,7 +247,7 @@ class TestTextInserterDialogSettings:
         from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
             result = _load_filename_fields()
@@ -270,7 +270,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_filename_fields()
@@ -293,7 +293,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_filename_fields()
@@ -312,7 +312,7 @@ class TestTextInserterDialogSettings:
         fields = ["date", "vehicle_no"]
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_filename_fields(fields)
@@ -338,7 +338,7 @@ class TestTextInserterDialogSettings:
         fields = ["date", "driver"]
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_filename_fields(fields)
@@ -357,7 +357,7 @@ class TestTextInserterDialogSettings:
         from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
             result = _load_window_size()
@@ -380,7 +380,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_window_size()
@@ -403,7 +403,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             result = _load_window_size()
@@ -421,7 +421,7 @@ class TestTextInserterDialogSettings:
         settings_path = tmp_path / "settings.json"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_window_size(700, 800)
@@ -446,7 +446,7 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
             _save_window_size(600, 700)
