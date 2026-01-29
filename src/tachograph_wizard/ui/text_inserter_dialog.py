@@ -21,19 +21,19 @@ from tachograph_wizard.core.exporter import Exporter
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_renderer import TextRenderer
 from tachograph_wizard.ui.settings_manager import (
-    _load_csv_path,
-    _load_filename_fields,
-    _load_last_used_date,
-    _load_output_dir,
-    _load_template_dir,
-    _load_window_size,
-    _parse_date_string,
-    _save_csv_path,
-    _save_filename_fields,
-    _save_last_used_date,
-    _save_output_dir,
-    _save_template_dir,
-    _save_window_size,
+    load_csv_path,
+    load_filename_fields,
+    load_last_used_date,
+    load_output_dir,
+    load_template_dir,
+    load_window_size,
+    parse_date_string,
+    save_csv_path,
+    save_filename_fields,
+    save_last_used_date,
+    save_output_dir,
+    save_template_dir,
+    save_window_size,
 )
 
 
@@ -89,19 +89,19 @@ class TextInserterDialog(GimpUi.Dialog):
         self.image = image
         self.template_manager = TemplateManager()
         self.default_templates_dir = self.template_manager.get_templates_dir()
-        self.template_dir = _load_template_dir(self.default_templates_dir)
+        self.template_dir = load_template_dir(self.default_templates_dir)
         self.template_paths: dict[str, Path] = {}
         self.csv_data: list[dict[str, str]] = []
         self.current_row_index = 0
-        self.default_date = _load_last_used_date() or datetime.date.today()
-        self.last_csv_path = _load_csv_path()
-        self.output_dir = _load_output_dir() or Path.home()
+        self.default_date = load_last_used_date() or datetime.date.today()
+        self.last_csv_path = load_csv_path()
+        self.output_dir = load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
         self._resize_save_timeout_id: int | None = None
         self._inserted_layers: list[Gimp.Layer] = []  # Track layers added during session
 
         # Load and set window size
-        width, height = _load_window_size()
+        width, height = load_window_size()
         self.set_default_size(width, height)
         self.set_border_width(12)
 
@@ -362,7 +362,7 @@ class TextInserterDialog(GimpUi.Dialog):
         box.pack_start(fields_label, False, False, 0)
 
         # Load saved filename field selections
-        saved_fields = _load_filename_fields()
+        saved_fields = load_filename_fields()
 
         fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
@@ -447,7 +447,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error(f"No templates found in {templates_dir}")
             return
 
-        _save_template_dir(templates_dir)
+        save_template_dir(templates_dir)
         self.status_label.set_text(f"Loaded {len(self.template_paths)} templates")
 
     def _on_use_default_templates_clicked(self, button: Gtk.Button) -> None:
@@ -458,7 +458,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error("Default templates folder is missing")
             return
 
-        _save_template_dir(self.default_templates_dir)
+        save_template_dir(self.default_templates_dir)
         self.status_label.set_text("Loaded default templates")
 
     def _set_calendar_date(self, date_value: datetime.date) -> None:
@@ -489,7 +489,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self.csv_data = CSVParser.parse(csv_path)
 
             # Save the CSV path for future use
-            _save_csv_path(csv_path)
+            save_csv_path(csv_path)
             self.last_csv_path = csv_path
 
             # Update row spinner
@@ -554,7 +554,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
         date_value = row_data.get("date", "").strip()
         if date_value:
-            parsed = _parse_date_string(date_value)
+            parsed = parse_date_string(date_value)
             if parsed is None:
                 if strict:
                     raise CsvDateError.from_string(date_value)
@@ -621,7 +621,7 @@ class TextInserterDialog(GimpUi.Dialog):
             # Flush displays
             Gimp.displays_flush()
 
-            _save_last_used_date(self._get_selected_date())
+            save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Inserted {len(layers)} text layers")
 
         except Exception as e:
@@ -632,7 +632,7 @@ class TextInserterDialog(GimpUi.Dialog):
         """Handle filename field checkbox toggle."""
         # Save the selected fields to settings
         selected_fields = self._get_selected_filename_fields()
-        _save_filename_fields(selected_fields)
+        save_filename_fields(selected_fields)
         self._update_filename_preview()
 
     def _get_selected_filename_fields(self) -> list[str]:
@@ -697,7 +697,7 @@ class TextInserterDialog(GimpUi.Dialog):
                 output_folder.mkdir(parents=True, exist_ok=True)
 
             # Save output directory for future use
-            _save_output_dir(output_folder)
+            save_output_dir(output_folder)
             self.output_dir = output_folder
 
             # Build row data with date
@@ -719,7 +719,7 @@ class TextInserterDialog(GimpUi.Dialog):
                 if hasattr(export_image, "delete"):
                     export_image.delete()
 
-            _save_last_used_date(self._get_selected_date())
+            save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Saved: {output_path}")
 
         except Exception as e:
@@ -747,18 +747,18 @@ class TextInserterDialog(GimpUi.Dialog):
         # Schedule a new save operation after 500ms of inactivity
         self._resize_save_timeout_id = GLib.timeout_add(
             500,  # milliseconds
-            self._save_window_size_delayed,
+            self.save_window_size_delayed,
         )
         return False
 
-    def _save_window_size_delayed(self) -> bool:
+    def save_window_size_delayed(self) -> bool:
         """Callback to save window size after debounce delay.
 
         Returns:
             False to prevent the timeout from repeating.
         """
         width, height = self.get_size()
-        _save_window_size(width, height)
+        save_window_size(width, height)
         self._resize_save_timeout_id = None
         return False  # Return False to stop the timeout from repeating
 

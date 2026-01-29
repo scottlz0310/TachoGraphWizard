@@ -89,7 +89,7 @@ def _load_path_setting(key: str) -> Path | None:
     return None
 
 
-def _parse_date_string(value: str) -> datetime.date | None:
+def parse_date_string(value: str) -> datetime.date | None:
     """Parse a date string in various formats.
 
     Args:
@@ -106,7 +106,7 @@ def _parse_date_string(value: str) -> datetime.date | None:
     return None
 
 
-def _load_last_used_date() -> datetime.date | None:
+def load_last_used_date() -> datetime.date | None:
     """Load the last used date from settings.
 
     Returns:
@@ -121,7 +121,7 @@ def _load_last_used_date() -> datetime.date | None:
     return None
 
 
-def _save_last_used_date(selected_date: datetime.date) -> None:
+def save_last_used_date(selected_date: datetime.date) -> None:
     """Save the last used date to settings.
 
     Args:
@@ -130,7 +130,7 @@ def _save_last_used_date(selected_date: datetime.date) -> None:
     _save_setting("text_inserter_last_date", selected_date.isoformat())
 
 
-def _load_template_dir(default_dir: Path) -> Path:
+def load_template_dir(default_dir: Path) -> Path:
     """Load the template directory from settings.
 
     Args:
@@ -143,7 +143,7 @@ def _load_template_dir(default_dir: Path) -> Path:
     return result if result else default_dir
 
 
-def _save_template_dir(selected_dir: Path) -> None:
+def save_template_dir(selected_dir: Path) -> None:
     """Save the template directory to settings.
 
     Args:
@@ -152,7 +152,7 @@ def _save_template_dir(selected_dir: Path) -> None:
     _save_setting("text_inserter_template_dir", str(selected_dir))
 
 
-def _load_csv_path() -> Path | None:
+def load_csv_path() -> Path | None:
     """Load the last used CSV file path from settings.
 
     Returns:
@@ -161,7 +161,7 @@ def _load_csv_path() -> Path | None:
     return _load_path_setting("text_inserter_csv_path")
 
 
-def _save_csv_path(csv_path: Path) -> None:
+def save_csv_path(csv_path: Path) -> None:
     """Save the CSV file path to settings.
 
     Args:
@@ -170,7 +170,7 @@ def _save_csv_path(csv_path: Path) -> None:
     _save_setting("text_inserter_csv_path", str(csv_path))
 
 
-def _load_output_dir() -> Path | None:
+def load_output_dir() -> Path | None:
     """Load the last used output directory from settings.
 
     Returns:
@@ -179,7 +179,7 @@ def _load_output_dir() -> Path | None:
     return _load_path_setting("text_inserter_output_dir")
 
 
-def _save_output_dir(output_dir: Path) -> None:
+def save_output_dir(output_dir: Path) -> None:
     """Save the output directory to settings.
 
     Args:
@@ -188,7 +188,7 @@ def _save_output_dir(output_dir: Path) -> None:
     _save_setting("text_inserter_output_dir", str(output_dir))
 
 
-def _load_filename_fields() -> list[str]:
+def load_filename_fields() -> list[str]:
     """Load saved filename field selections.
 
     Returns:
@@ -205,7 +205,7 @@ def _load_filename_fields() -> list[str]:
     return ["date"]  # Default: only date is selected
 
 
-def _save_filename_fields(fields: list[str]) -> None:
+def save_filename_fields(fields: list[str]) -> None:
     """Save filename field selections.
 
     Args:
@@ -214,7 +214,7 @@ def _save_filename_fields(fields: list[str]) -> None:
     _save_setting("text_inserter_filename_fields", json.dumps(fields))
 
 
-def _load_window_size() -> tuple[int, int]:
+def load_window_size() -> tuple[int, int]:
     """Load saved window size.
 
     Returns:
@@ -230,7 +230,7 @@ def _load_window_size() -> tuple[int, int]:
         return (500, 600)
 
 
-def _save_window_size(width: int, height: int) -> None:
+def save_window_size(width: int, height: int) -> None:
     """Save window size.
 
     Args:
