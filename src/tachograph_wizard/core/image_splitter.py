@@ -7,7 +7,7 @@ tachograph charts into individual images.
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,35 +16,30 @@ import gi
 gi.require_version("Gegl", "0.4")
 gi.require_version("Gimp", "3.0")
 
-import os
-
 from gi.repository import Gegl, Gimp, GObject
 
+from tachograph_wizard.core.image_analysis import (
+    Component,
+    buffer_get_bytes,
+    find_components,
+    get_analysis_drawable,
+    get_analysis_scale,
+    get_image_dpi,
+    otsu_threshold,
+)
+from tachograph_wizard.core.image_operations import (
+    apply_component_mask,
+    crop_image,
+    duplicate_image,
+)
 from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 
 if TYPE_CHECKING:
     from tachograph_wizard.utils.types import SplitResult
 
 
-@dataclass
-class _Component:
-    min_x: int
-    min_y: int
-    max_x: int
-    max_y: int
-    area: int
-
-    @property
-    def width(self) -> int:
-        return self.max_x - self.min_x + 1
-
-    @property
-    def height(self) -> int:
-        return self.max_y - self.min_y + 1
-
-    @property
-    def diameter(self) -> int:
-        return max(self.width, self.height)
+# 後方互換性のためのエイリアス
+_Component = Component
 
 
 class ImageSplitter:
@@ -70,179 +65,48 @@ class ImageSplitter:
 
     @staticmethod
     def _analysis_scale(width: int, height: int) -> float:
-        max_dim = max(width, height)
-        if max_dim <= 0:
-            return 1.0
-        return min(1.0, ImageSplitter._ANALYSIS_MAX_SIZE / max_dim)
+        """後方互換性のためのラッパー."""
+        return get_analysis_scale(width, height)
 
     @staticmethod
     def _get_image_dpi(image: Gimp.Image) -> float | None:
-        try:
-            resolution = image.get_resolution()
-        except Exception:
-            resolution = None
-
-        if isinstance(resolution, (tuple, list)) and len(resolution) >= 2:
-            try:
-                x_res = float(resolution[0])
-                y_res = float(resolution[1])
-                dpi = y_res if y_res > 0 else x_res
-                if 50.0 <= dpi <= 1200.0:
-                    return dpi
-            except (TypeError, ValueError):
-                return None
-
-        return None
+        """後方互換性のためのラッパー."""
+        return get_image_dpi(image)
 
     @staticmethod
     def _get_analysis_drawable(image: Gimp.Image) -> Gimp.Drawable:
-        try:
-            drawable = image.get_active_drawable()
-            if drawable is not None:
-                return drawable
-        except Exception:
-            pass
-
-        layers = image.get_layers()
-        if not layers:
-            msg = "No layers available for analysis"
-            raise RuntimeError(msg)
-        return layers[0]
+        """後方互換性のためのラッパー."""
+        return get_analysis_drawable(image)
 
     @staticmethod
     def _buffer_get_bytes(
-        buffer: Gegl.Buffer,
-        rect: Gegl.Rectangle,
+        buffer: Any,  # Gegl.Buffer - use Any to avoid import
+        rect: Any,  # Gegl.Rectangle
         scale: float,
         fmt: str,
     ) -> bytes:
-        attempts = [
-            (rect, scale, fmt, Gegl.AbyssPolicy.CLAMP),
-            (rect, scale, fmt),
-            (rect, fmt, Gegl.AbyssPolicy.CLAMP),
-            (rect, fmt),
-        ]
-        last_error: Exception | None = None
-        for args in attempts:
-            try:
-                data = buffer.get(*args)
-                if isinstance(data, (bytes, bytearray)):
-                    return bytes(data)
-                get_data = getattr(data, "get_data", None)
-                if callable(get_data):
-                    return bytes(get_data())  # type: ignore[arg-type]
-                return bytes(data)  # type: ignore[arg-type]
-            except Exception as exc:
-                last_error = exc
-                continue
-        msg = f"Failed to read buffer data ({type(last_error).__name__}: {last_error})"
-        raise RuntimeError(msg)
+        """後方互換性のためのラッパー."""
+        return buffer_get_bytes(buffer, rect, scale, fmt)
 
     @staticmethod
     def _otsu_threshold(hist: list[int], total: int) -> int:
-        if total <= 0:
-            return 255
-        sum_total = sum(i * hist[i] for i in range(256))
-        sum_back = 0
-        weight_back = 0
-        max_var = -1.0
-        threshold = 200
-
-        for t in range(256):
-            weight_back += hist[t]
-            if weight_back == 0:
-                continue
-            weight_fore = total - weight_back
-            if weight_fore == 0:
-                break
-            sum_back += t * hist[t]
-            mean_back = sum_back / weight_back
-            mean_fore = (sum_total - sum_back) / weight_fore
-            between_var = weight_back * weight_fore * (mean_back - mean_fore) ** 2
-            if between_var > max_var:
-                max_var = between_var
-                threshold = t
-
-        return threshold
+        """後方互換性のためのラッパー."""
+        return otsu_threshold(hist, total)
 
     @staticmethod
     def _find_components(mask: bytearray, width: int, height: int) -> list[_Component]:
-        visited = bytearray(len(mask))
-        components: list[_Component] = []
-
-        for idx, value in enumerate(mask):
-            if value == 0 or visited[idx]:
-                continue
-
-            stack = [idx]
-            visited[idx] = 1
-            min_x = max_x = idx % width
-            min_y = max_y = idx // width
-            area = 0
-
-            while stack:
-                current = stack.pop()
-                x = current % width
-                y = current // width
-                area += 1
-                min_x = min(min_x, x)
-                max_x = max(max_x, x)
-                min_y = min(min_y, y)
-                max_y = max(max_y, y)
-
-                left = current - 1
-                right = current + 1
-                up = current - width
-                down = current + width
-
-                if x > 0 and mask[left] and not visited[left]:
-                    visited[left] = 1
-                    stack.append(left)
-                if x < width - 1 and mask[right] and not visited[right]:
-                    visited[right] = 1
-                    stack.append(right)
-                if y > 0 and mask[up] and not visited[up]:
-                    visited[up] = 1
-                    stack.append(up)
-                if y < height - 1 and mask[down] and not visited[down]:
-                    visited[down] = 1
-                    stack.append(down)
-
-            components.append(_Component(min_x=min_x, min_y=min_y, max_x=max_x, max_y=max_y, area=area))
-
-        return components
+        """後方互換性のためのラッパー."""
+        return find_components(mask, width, height)
 
     @staticmethod
     def _duplicate_image(image: Gimp.Image) -> Gimp.Image:
-        dup_fn = getattr(image, "duplicate", None)
-        if callable(dup_fn):
-            return dup_fn()
-
-        result = run_pdb_procedure(
-            "gimp-image-duplicate",
-            [GObject.Value(Gimp.Image, image)],
-            debug_log=ImageSplitter._debug_log,
-        )
-        return result.index(1)
+        """後方互換性のためのラッパー."""
+        return duplicate_image(image, debug_log=ImageSplitter._debug_log)
 
     @staticmethod
     def _crop_image(image: Gimp.Image, x: int, y: int, width: int, height: int) -> None:
-        crop_fn = getattr(image, "crop", None)
-        if callable(crop_fn):
-            crop_fn(width, height, x, y)
-            return
-
-        run_pdb_procedure(
-            "gimp-image-crop",
-            [
-                GObject.Value(Gimp.Image, image),
-                GObject.Value(GObject.TYPE_INT, width),
-                GObject.Value(GObject.TYPE_INT, height),
-                GObject.Value(GObject.TYPE_INT, x),
-                GObject.Value(GObject.TYPE_INT, y),
-            ],
-            debug_log=ImageSplitter._debug_log,
-        )
+        """後方互換性のためのラッパー."""
+        crop_image(image, x, y, width, height, debug_log=ImageSplitter._debug_log)
 
     @staticmethod
     def _apply_component_mask(
@@ -254,155 +118,21 @@ class ImageSplitter:
         crop_y: int,
         scale_x: float,
         scale_y: float,
-        threshold: int,  # noqa: ARG004
+        threshold: int,
     ) -> None:
-        """Remove garbage pixels outside the component mask.
-
-        Creates a layer mask from the component mask, making pixels outside
-        the detected component transparent while preserving all pixels within it.
-
-        Args:
-            image: Cropped image to clean up
-            comp_mask: Binary mask (analysis resolution) of the component
-            mask_width: Width of the analysis mask
-            mask_height: Height of the analysis mask
-            crop_x: X offset of crop in original image
-            crop_y: Y offset of crop in original image
-            scale_x: Analysis scale factor X
-            scale_y: Analysis scale factor Y
-            threshold: Detection threshold used (same as used for detection)
-        """
-        try:
-            layers = image.get_layers()
-            if not layers:
-                return
-
-            layer = layers[0]
-            img_width = image.get_width()
-            img_height = image.get_height()
-
-            # Ensure layer has alpha channel
-            if not layer.has_alpha():
-                layer.add_alpha()
-
-            # Build a selection from the component mask
-            # Start with empty selection
-            run_pdb_procedure(
-                "gimp-selection-none",
-                [GObject.Value(Gimp.Image, image)],
-                debug_log=ImageSplitter._debug_log,
-            )
-
-            # Find bounding box of component in analysis coordinates
-            min_ax, max_ax = mask_width, 0
-            min_ay, max_ay = mask_height, 0
-            component_pixel_count = 0
-            for ay in range(mask_height):
-                for ax in range(mask_width):
-                    if comp_mask[ay * mask_width + ax] == 1:
-                        min_ax = min(min_ax, ax)
-                        max_ax = max(max_ax, ax)
-                        min_ay = min(min_ay, ay)
-                        max_ay = max(max_ay, ay)
-                        component_pixel_count += 1
-
-            ImageSplitter._debug_log(
-                f"garbage_removal: component bbox in analysis coords: "
-                f"x=[{min_ax},{max_ax}] y=[{min_ay},{max_ay}] pixels={component_pixel_count}",
-            )
-
-            # Convert to full resolution coordinates
-            full_min_x = int((min_ax / scale_x) - crop_x)
-            full_max_x = int((max_ax / scale_x) - crop_x)
-            full_min_y = int((min_ay / scale_y) - crop_y)
-            full_max_y = int((max_ay / scale_y) - crop_y)
-
-            ImageSplitter._debug_log(
-                f"garbage_removal: bbox in cropped image coords (before clamp): "
-                f"x=[{full_min_x},{full_max_x}] y=[{full_min_y},{full_max_y}]",
-            )
-
-            # Clamp to image bounds
-            full_min_x = max(0, full_min_x)
-            full_max_x = min(img_width - 1, full_max_x)
-            full_min_y = max(0, full_min_y)
-            full_max_y = min(img_height - 1, full_max_y)
-
-            # Select the approximate component area using ellipse (better for circular discs)
-            width = full_max_x - full_min_x + 1
-            height = full_max_y - full_min_y + 1
-
-            ImageSplitter._debug_log(
-                f"garbage_removal: ellipse selection params: "
-                f"x={full_min_x} y={full_min_y} w={width} h={height} "
-                f"(image size: {img_width}x{img_height})",
-            )
-
-            if width > 0 and height > 0:
-                # Select component area with ellipse
-                run_pdb_procedure(
-                    "gimp-image-select-ellipse",
-                    [
-                        GObject.Value(Gimp.Image, image),
-                        GObject.Value(Gimp.ChannelOps, Gimp.ChannelOps.REPLACE),
-                        GObject.Value(GObject.TYPE_DOUBLE, float(full_min_x)),
-                        GObject.Value(GObject.TYPE_DOUBLE, float(full_min_y)),
-                        GObject.Value(GObject.TYPE_DOUBLE, float(width)),
-                        GObject.Value(GObject.TYPE_DOUBLE, float(height)),
-                    ],
-                    debug_log=ImageSplitter._debug_log,
-                )
-
-                # Feather selection slightly to avoid hard edges
-                run_pdb_procedure(
-                    "gimp-selection-feather",
-                    [
-                        GObject.Value(Gimp.Image, image),
-                        GObject.Value(GObject.TYPE_DOUBLE, 2.0),  # 2px feather
-                    ],
-                    debug_log=ImageSplitter._debug_log,
-                )
-
-                # Invert to select garbage (outside ellipse)
-                run_pdb_procedure(
-                    "gimp-selection-invert",
-                    [GObject.Value(Gimp.Image, image)],
-                    debug_log=ImageSplitter._debug_log,
-                )
-
-                # Check if selection is empty
-                is_empty_result = run_pdb_procedure(
-                    "gimp-selection-is-empty",
-                    [GObject.Value(Gimp.Image, image)],
-                    debug_log=ImageSplitter._debug_log,
-                )
-                is_empty = is_empty_result.index(1)  # Second return value is the boolean
-
-                if is_empty:
-                    ImageSplitter._debug_log("garbage_removal: selection is empty, nothing to delete")
-                else:
-                    # Delete garbage (make selected area transparent)
-                    run_pdb_procedure(
-                        "gimp-drawable-edit-clear",
-                        [GObject.Value(Gimp.Drawable, layer)],
-                        debug_log=ImageSplitter._debug_log,
-                    )
-                    ImageSplitter._debug_log("garbage_removal: deleted garbage outside ellipse")
-
-                # Remove selection
-                run_pdb_procedure(
-                    "gimp-selection-none",
-                    [GObject.Value(Gimp.Image, image)],
-                    debug_log=ImageSplitter._debug_log,
-                )
-
-                ImageSplitter._debug_log("garbage_removal: applied successfully")
-            else:
-                ImageSplitter._debug_log("garbage_removal: component too small, skipped")
-
-        except Exception as e:
-            ImageSplitter._debug_log(f"garbage_removal failed: {type(e).__name__}: {e}")
-            # Continue without garbage removal if it fails
+        """後方互換性のためのラッパー."""
+        apply_component_mask(
+            image,
+            comp_mask,
+            mask_width,
+            mask_height,
+            crop_x,
+            crop_y,
+            scale_x,
+            scale_y,
+            threshold,
+            debug_log=ImageSplitter._debug_log,
+        )
 
     @staticmethod
     def split_by_guides(image: Gimp.Image) -> list[Gimp.Image]:
