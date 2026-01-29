@@ -182,10 +182,7 @@ def _load_filename_fields() -> list[str]:
             if isinstance(fields, list):
                 return fields
         except json.JSONDecodeError:
-            _debug_log(
-                "Invalid JSON in 'text_inserter_filename_fields' setting; "
-                "falling back to default value."
-            )
+            _debug_log("Invalid JSON in 'text_inserter_filename_fields' setting; falling back to default value.")
     return ["date"]  # Default: only date is selected
 
 
