@@ -15,11 +15,10 @@ gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GLib", "2.0")
 
-from gi.repository import Gimp, GimpUi, GLib, GObject, Gtk
+from gi.repository import Gimp, GimpUi, GLib, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
 from tachograph_wizard.core.exporter import Exporter
-from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_renderer import TextRenderer
 
@@ -243,8 +242,7 @@ class TextInserterDialog(GimpUi.Dialog):
         self.output_dir = _load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
         self._resize_save_timeout_id: int | None = None
-        self._has_pending_changes = False  # Track if any text insertions were made
-        self._undo_group_started = False  # Track if undo group needs cleanup
+        self._inserted_layers: list[Gimp.Layer] = []  # Track layers added during session
 
         # Load and set window size
         width, height = _load_window_size()
@@ -260,11 +258,6 @@ class TextInserterDialog(GimpUi.Dialog):
 
         # Create UI
         self._create_ui()
-
-        # Start undo group AFTER all UI setup succeeds
-        # This ensures the undo group is only started when the dialog is fully initialized
-        self.image.undo_group_start()
-        self._undo_group_started = True
 
     def _create_ui(self) -> None:
         """Create the dialog UI."""
@@ -767,7 +760,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
             # Track that changes were made
             if layers:
-                self._has_pending_changes = True
+                self._inserted_layers.extend(layers)
 
             # Flush displays
             Gimp.displays_flush()
@@ -932,27 +925,21 @@ class TextInserterDialog(GimpUi.Dialog):
         self.status_label.set_text(f"Error: {message}")
 
     def finalize_response(self, response: Gtk.ResponseType) -> None:
-        """Finalize the dialog response by handling undo group.
+        """Finalize the dialog response by handling inserted layers.
 
         Call this method after dialog.run() returns and before destroy().
-        If the user clicked Cancel, this undoes all changes made during the session.
+        If the user clicked Cancel, this removes all layers added during the session.
         If the user clicked OK, changes are committed.
 
         Args:
             response: The dialog response type (OK, CANCEL, etc.)
         """
-        # Only handle undo group if it was started
-        if not self._undo_group_started:
-            return
-
-        # End the undo group first
-        self.image.undo_group_end()
-
-        # If cancelled and changes were made, undo them
-        if response != Gtk.ResponseType.OK and self._has_pending_changes:
-            # Undo the entire group using the compatibility wrapper
-            run_pdb_procedure(
-                "gimp-edit-undo",
-                [GObject.Value(Gimp.Image, self.image)],
-            )
+        # If cancelled, remove all inserted layers
+        if response != Gtk.ResponseType.OK and self._inserted_layers:
+            for layer in self._inserted_layers:
+                try:
+                    if layer.is_valid():
+                        self.image.remove_layer(layer)
+                except Exception as e:
+                    _debug_log(f"WARNING: Failed to remove layer during finalize_response: {e}")
             Gimp.displays_flush()
