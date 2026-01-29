@@ -556,9 +556,7 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Cancel response does not undo when no changes were made."""
-        from gi.repository import GObject
-
-        gimp_mock, _, _ = mock_gimp_modules
+        _, _, _ = mock_gimp_modules
 
         # Create a mock image
         mock_image = MagicMock()
@@ -573,18 +571,11 @@ class TestTextInserterDialogUndo:
         # Simulate finalize_response logic for CANCEL without pending changes
         _undo_group_started = True
         _has_pending_changes = False
-        response = gtk_mock.ResponseType.CANCEL
 
         # Mock run_pdb_procedure
         with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
             if _undo_group_started:
                 mock_image.undo_group_end()
-                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    mock_run_pdb(
-                        "gimp-edit-undo",
-                        [GObject.Value(gimp_mock.Image, mock_image)],
-                    )
-                    gimp_mock.displays_flush()
 
             # Verify undo group was ended
             mock_image.undo_group_end.assert_called_once()
@@ -597,9 +588,7 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """finalize_response does nothing if undo group was never started."""
-        from gi.repository import GObject
-
-        gimp_mock, _, _ = mock_gimp_modules
+        _, _, _ = mock_gimp_modules
 
         # Create a mock image
         mock_image = MagicMock()
@@ -608,22 +597,10 @@ class TestTextInserterDialogUndo:
         _undo_group_started = False
         _has_pending_changes = True
 
-        import sys
-
-        gtk_mock = sys.modules["gi.repository.Gtk"]
-        gtk_mock.ResponseType.CANCEL = 0
-        response = gtk_mock.ResponseType.CANCEL
-
         # Mock run_pdb_procedure
         with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
-            if _undo_group_started:
-                mock_image.undo_group_end()
-                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    mock_run_pdb(
-                        "gimp-edit-undo",
-                        [GObject.Value(gimp_mock.Image, mock_image)],
-                    )
-                    gimp_mock.displays_flush()
+            # In this scenario, the undo group was never started, so no undo
+            # operations should be performed and no PDB procedures should run.
 
             # Verify undo_group_end was NOT called
             mock_image.undo_group_end.assert_not_called()
