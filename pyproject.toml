@@ -154,7 +154,6 @@ reportUnknownParameterType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
 reportAttributeAccessIssue = false  # gi.repository dynamic imports have no type stubs
-reportUnnecessaryComparison = false  # Test mocking patterns may have literal comparisons
 # Enable other strict checks
 reportUnusedImport = true
 reportUnusedClass = true

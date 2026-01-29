@@ -243,9 +243,7 @@ class TextInserterDialog(GimpUi.Dialog):
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
         self._resize_save_timeout_id: int | None = None
         self._has_pending_changes = False  # Track if any text insertions were made
-
-        # Start undo group to allow cancellation of all changes
-        self.image.undo_group_start()
+        self._undo_group_started = False  # Track if undo group needs cleanup
 
         # Load and set window size
         width, height = _load_window_size()
@@ -261,6 +259,11 @@ class TextInserterDialog(GimpUi.Dialog):
 
         # Create UI
         self._create_ui()
+
+        # Start undo group AFTER all UI setup succeeds
+        # This ensures the undo group is only started when the dialog is fully initialized
+        self.image.undo_group_start()
+        self._undo_group_started = True
 
     def _create_ui(self) -> None:
         """Create the dialog UI."""
@@ -937,6 +940,10 @@ class TextInserterDialog(GimpUi.Dialog):
         Args:
             response: The dialog response type (OK, CANCEL, etc.)
         """
+        # Only handle undo group if it was started
+        if not self._undo_group_started:
+            return
+
         # End the undo group first
         self.image.undo_group_end()
 
