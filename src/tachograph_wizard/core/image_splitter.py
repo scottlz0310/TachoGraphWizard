@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from tachograph_wizard.utils.types import SplitResult
 
 
-# 後方互換性のためのエイリアス
+# Backward compatibility alias
 _Component = Component
 
 
@@ -48,7 +48,6 @@ class ImageSplitter:
     _SPLIT_BY_GUIDES_LOG_VERSION = "2025-12-24.1"
     _DEFAULT_DIAMETER_MM = 123.5
     _MIN_DIAMETER_RATIO = 0.7
-    _ANALYSIS_MAX_SIZE = 1200
 
     @staticmethod
     def _debug_log(message: str) -> None:
@@ -65,47 +64,47 @@ class ImageSplitter:
 
     @staticmethod
     def _analysis_scale(width: int, height: int) -> float:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for get_analysis_scale."""
         return get_analysis_scale(width, height)
 
     @staticmethod
     def _get_image_dpi(image: Gimp.Image) -> float | None:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for get_image_dpi."""
         return get_image_dpi(image)
 
     @staticmethod
     def _get_analysis_drawable(image: Gimp.Image) -> Gimp.Drawable:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for get_analysis_drawable."""
         return get_analysis_drawable(image)
 
     @staticmethod
     def _buffer_get_bytes(
-        buffer: Any,  # Gegl.Buffer - use Any to avoid import
-        rect: Any,  # Gegl.Rectangle
+        buffer: Gegl.Buffer,
+        rect: Gegl.Rectangle,
         scale: float,
         fmt: str,
     ) -> bytes:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for buffer_get_bytes."""
         return buffer_get_bytes(buffer, rect, scale, fmt)
 
     @staticmethod
     def _otsu_threshold(hist: list[int], total: int) -> int:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for otsu_threshold."""
         return otsu_threshold(hist, total)
 
     @staticmethod
     def _find_components(mask: bytearray, width: int, height: int) -> list[_Component]:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for find_components."""
         return find_components(mask, width, height)
 
     @staticmethod
     def _duplicate_image(image: Gimp.Image) -> Gimp.Image:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for duplicate_image."""
         return duplicate_image(image, debug_log=ImageSplitter._debug_log)
 
     @staticmethod
     def _crop_image(image: Gimp.Image, x: int, y: int, width: int, height: int) -> None:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for crop_image."""
         crop_image(image, x, y, width, height, debug_log=ImageSplitter._debug_log)
 
     @staticmethod
@@ -120,7 +119,7 @@ class ImageSplitter:
         scale_y: float,
         threshold: int,
     ) -> None:
-        """後方互換性のためのラッパー."""
+        """Backward compatibility wrapper for apply_component_mask."""
         apply_component_mask(
             image,
             comp_mask,

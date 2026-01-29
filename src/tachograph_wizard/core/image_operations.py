@@ -23,7 +23,7 @@ from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 def _default_debug_log(message: str) -> None:
     """デフォルトのデバッグログ関数.
 
-    環境変数TEMPまたはTMPで指定されたディレクトリにログを出力する。
+    環境変数TEMP、TMPまたはLOCALAPPDATAで指定されたディレクトリにログを出力する。
 
     Args:
         message: ログメッセージ

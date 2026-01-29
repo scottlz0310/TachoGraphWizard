@@ -113,6 +113,8 @@ def get_analysis_drawable(image: Gimp.Image) -> Gimp.Drawable:
         if drawable is not None:
             return drawable
     except Exception:
+        # アクティブなドローアブルが取得できない場合は無視し、
+        # 後続のレイヤー取得処理にフォールバックする。
         pass
 
     layers = image.get_layers()
@@ -217,7 +219,21 @@ def find_components(mask: bytearray, width: int, height: int) -> list[Component]
 
     Returns:
         検出された連結成分のリスト
+
+    Raises:
+        ValueError: 入力パラメータが無効な場合
     """
+    if width <= 0:
+        msg = f"width must be positive, got {width}"
+        raise ValueError(msg)
+    if height <= 0:
+        msg = f"height must be positive, got {height}"
+        raise ValueError(msg)
+    expected_len = width * height
+    if len(mask) != expected_len:
+        msg = f"mask length ({len(mask)}) does not match width * height ({expected_len})"
+        raise ValueError(msg)
+
     visited = bytearray(len(mask))
     components: list[Component] = []
 

@@ -250,3 +250,151 @@ class TestFindComponents:
         mask[11] = 1  # (1, 1)
         components = find_components(mask, 10, 10)
         assert len(components) == 2
+
+    def test_invalid_width_raises_value_error(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that width <= 0 raises ValueError."""
+        from tachograph_wizard.core.image_analysis import find_components
+
+        mask = bytearray(100)
+        with pytest.raises(ValueError, match="width must be positive"):
+            find_components(mask, 0, 10)
+        with pytest.raises(ValueError, match="width must be positive"):
+            find_components(mask, -5, 10)
+
+    def test_invalid_height_raises_value_error(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that height <= 0 raises ValueError."""
+        from tachograph_wizard.core.image_analysis import find_components
+
+        mask = bytearray(100)
+        with pytest.raises(ValueError, match="height must be positive"):
+            find_components(mask, 10, 0)
+        with pytest.raises(ValueError, match="height must be positive"):
+            find_components(mask, 10, -5)
+
+    def test_mask_length_mismatch_raises_value_error(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that mask length != width * height raises ValueError."""
+        from tachograph_wizard.core.image_analysis import find_components
+
+        mask = bytearray(50)  # Should be 100 for 10x10
+        with pytest.raises(ValueError, match=r"mask length .* does not match"):
+            find_components(mask, 10, 10)
+
+
+class TestGetImageDpi:
+    """Tests for the get_image_dpi function."""
+
+    def test_get_image_dpi_returns_valid_dpi(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that valid DPI is returned."""
+        from tachograph_wizard.core.image_analysis import get_image_dpi
+
+        mock_image = MagicMock()
+        mock_image.get_resolution.return_value = (300.0, 300.0)
+        result = get_image_dpi(mock_image)
+        assert result == 300.0
+
+    def test_get_image_dpi_prefers_y_resolution(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that y resolution is preferred over x."""
+        from tachograph_wizard.core.image_analysis import get_image_dpi
+
+        mock_image = MagicMock()
+        mock_image.get_resolution.return_value = (200.0, 300.0)
+        result = get_image_dpi(mock_image)
+        assert result == 300.0
+
+    def test_get_image_dpi_returns_none_for_invalid_range(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that None is returned for DPI outside valid range."""
+        from tachograph_wizard.core.image_analysis import get_image_dpi
+
+        mock_image = MagicMock()
+        mock_image.get_resolution.return_value = (10.0, 10.0)  # Too low
+        assert get_image_dpi(mock_image) is None
+
+        mock_image.get_resolution.return_value = (2000.0, 2000.0)  # Too high
+        assert get_image_dpi(mock_image) is None
+
+    def test_get_image_dpi_returns_none_on_exception(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that None is returned when exception occurs."""
+        from tachograph_wizard.core.image_analysis import get_image_dpi
+
+        mock_image = MagicMock()
+        mock_image.get_resolution.side_effect = Exception("Test error")
+        assert get_image_dpi(mock_image) is None
+
+
+class TestGetAnalysisDrawable:
+    """Tests for the get_analysis_drawable function."""
+
+    def test_get_analysis_drawable_returns_active(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that active drawable is returned when available."""
+        from tachograph_wizard.core.image_analysis import get_analysis_drawable
+
+        mock_image = MagicMock()
+        mock_drawable = MagicMock()
+        mock_image.get_active_drawable.return_value = mock_drawable
+        result = get_analysis_drawable(mock_image)
+        assert result is mock_drawable
+
+    def test_get_analysis_drawable_falls_back_to_layers(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that first layer is returned when active drawable is None."""
+        from tachograph_wizard.core.image_analysis import get_analysis_drawable
+
+        mock_image = MagicMock()
+        mock_image.get_active_drawable.return_value = None
+        mock_layer = MagicMock()
+        mock_image.get_layers.return_value = [mock_layer]
+        result = get_analysis_drawable(mock_image)
+        assert result is mock_layer
+
+    def test_get_analysis_drawable_falls_back_on_exception(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that first layer is returned when exception occurs."""
+        from tachograph_wizard.core.image_analysis import get_analysis_drawable
+
+        mock_image = MagicMock()
+        mock_image.get_active_drawable.side_effect = Exception("Test error")
+        mock_layer = MagicMock()
+        mock_image.get_layers.return_value = [mock_layer]
+        result = get_analysis_drawable(mock_image)
+        assert result is mock_layer
+
+    def test_get_analysis_drawable_raises_when_no_layers(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test that RuntimeError is raised when no layers exist."""
+        from tachograph_wizard.core.image_analysis import get_analysis_drawable
+
+        mock_image = MagicMock()
+        mock_image.get_active_drawable.return_value = None
+        mock_image.get_layers.return_value = []
+        with pytest.raises(RuntimeError, match="No layers available"):
+            get_analysis_drawable(mock_image)
