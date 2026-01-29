@@ -20,13 +20,13 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load CSV path returns None when settings file doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_csv_path
+        from tachograph_wizard.ui.settings_manager import load_csv_path
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
-            result = _load_csv_path()
+            result = load_csv_path()
 
         assert result is None
 
@@ -36,7 +36,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load CSV path returns the path when settings contain a valid path."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_csv_path
+        from tachograph_wizard.ui.settings_manager import load_csv_path
 
         # Create a CSV file
         csv_file = tmp_path / "test.csv"
@@ -50,10 +50,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_csv_path()
+            result = load_csv_path()
 
         assert result == csv_file
 
@@ -63,7 +63,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load CSV path returns None when saved path doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_csv_path
+        from tachograph_wizard.ui.settings_manager import load_csv_path
 
         # Create settings file with non-existent path
         settings_path = tmp_path / "settings.json"
@@ -73,10 +73,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_csv_path()
+            result = load_csv_path()
 
         assert result is None
 
@@ -86,16 +86,16 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save CSV path creates a new settings file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_csv_path
+        from tachograph_wizard.ui.settings_manager import save_csv_path
 
         settings_path = tmp_path / "settings.json"
         csv_path = tmp_path / "test.csv"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_csv_path(csv_path)
+            save_csv_path(csv_path)
 
         assert settings_path.exists()
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -107,7 +107,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save CSV path preserves other settings in the file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_csv_path
+        from tachograph_wizard.ui.settings_manager import save_csv_path
 
         settings_path = tmp_path / "settings.json"
         settings_path.write_text(
@@ -117,10 +117,10 @@ class TestTextInserterDialogSettings:
         csv_path = tmp_path / "test.csv"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_csv_path(csv_path)
+            save_csv_path(csv_path)
 
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert data["other_setting"] == "value"
@@ -132,13 +132,13 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load output directory returns None when settings file doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_output_dir
+        from tachograph_wizard.ui.settings_manager import load_output_dir
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
-            result = _load_output_dir()
+            result = load_output_dir()
 
         assert result is None
 
@@ -148,7 +148,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load output directory returns the path when settings contain a valid path."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_output_dir
+        from tachograph_wizard.ui.settings_manager import load_output_dir
 
         # Create an output directory
         output_dir = tmp_path / "output"
@@ -162,10 +162,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_output_dir()
+            result = load_output_dir()
 
         assert result == output_dir
 
@@ -175,7 +175,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load output directory returns None when saved path doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_output_dir
+        from tachograph_wizard.ui.settings_manager import load_output_dir
 
         # Create settings file with non-existent path
         settings_path = tmp_path / "settings.json"
@@ -185,10 +185,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_output_dir()
+            result = load_output_dir()
 
         assert result is None
 
@@ -198,16 +198,16 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save output directory creates a new settings file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_output_dir
+        from tachograph_wizard.ui.settings_manager import save_output_dir
 
         settings_path = tmp_path / "settings.json"
         output_dir = tmp_path / "output"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_output_dir(output_dir)
+            save_output_dir(output_dir)
 
         assert settings_path.exists()
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -219,7 +219,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save output directory preserves other settings in the file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_output_dir
+        from tachograph_wizard.ui.settings_manager import save_output_dir
 
         settings_path = tmp_path / "settings.json"
         settings_path.write_text(
@@ -229,10 +229,10 @@ class TestTextInserterDialogSettings:
         output_dir = tmp_path / "output"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_output_dir(output_dir)
+            save_output_dir(output_dir)
 
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert data["other_setting"] == "value"
@@ -244,13 +244,13 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load filename fields returns default when settings file doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+        from tachograph_wizard.ui.settings_manager import load_filename_fields
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
-            result = _load_filename_fields()
+            result = load_filename_fields()
 
         assert result == ["date"]
 
@@ -260,7 +260,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load filename fields returns saved fields from settings."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+        from tachograph_wizard.ui.settings_manager import load_filename_fields
 
         # Create settings file
         settings_path = tmp_path / "settings.json"
@@ -270,10 +270,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_filename_fields()
+            result = load_filename_fields()
 
         assert result == ["date", "vehicle_no", "driver"]
 
@@ -283,7 +283,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load filename fields returns default when saved value is invalid JSON."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+        from tachograph_wizard.ui.settings_manager import load_filename_fields
 
         # Create settings file with invalid JSON
         settings_path = tmp_path / "settings.json"
@@ -293,10 +293,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_filename_fields()
+            result = load_filename_fields()
 
         assert result == ["date"]
 
@@ -306,16 +306,16 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save filename fields creates a new settings file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_filename_fields
+        from tachograph_wizard.ui.settings_manager import save_filename_fields
 
         settings_path = tmp_path / "settings.json"
         fields = ["date", "vehicle_no"]
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_filename_fields(fields)
+            save_filename_fields(fields)
 
         assert settings_path.exists()
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -328,7 +328,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save filename fields preserves other settings in the file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_filename_fields
+        from tachograph_wizard.ui.settings_manager import save_filename_fields
 
         settings_path = tmp_path / "settings.json"
         settings_path.write_text(
@@ -338,10 +338,10 @@ class TestTextInserterDialogSettings:
         fields = ["date", "driver"]
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_filename_fields(fields)
+            save_filename_fields(fields)
 
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert data["other_setting"] == "value"
@@ -354,13 +354,13 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load window size returns default when settings file doesn't exist."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+        from tachograph_wizard.ui.settings_manager import load_window_size
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=tmp_path / "nonexistent" / "settings.json",
         ):
-            result = _load_window_size()
+            result = load_window_size()
 
         assert result == (500, 600)
 
@@ -370,7 +370,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load window size returns saved size from settings."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+        from tachograph_wizard.ui.settings_manager import load_window_size
 
         # Create settings file
         settings_path = tmp_path / "settings.json"
@@ -380,10 +380,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_window_size()
+            result = load_window_size()
 
         assert result == (800, 900)
 
@@ -393,7 +393,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Load window size returns default when saved values are invalid."""
-        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+        from tachograph_wizard.ui.settings_manager import load_window_size
 
         # Create settings file with invalid values
         settings_path = tmp_path / "settings.json"
@@ -403,10 +403,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            result = _load_window_size()
+            result = load_window_size()
 
         assert result == (500, 600)
 
@@ -416,15 +416,15 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save window size creates a new settings file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_window_size
+        from tachograph_wizard.ui.settings_manager import save_window_size
 
         settings_path = tmp_path / "settings.json"
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_window_size(700, 800)
+            save_window_size(700, 800)
 
         assert settings_path.exists()
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -437,7 +437,7 @@ class TestTextInserterDialogSettings:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Save window size preserves other settings in the file."""
-        from tachograph_wizard.ui.text_inserter_dialog import _save_window_size
+        from tachograph_wizard.ui.settings_manager import save_window_size
 
         settings_path = tmp_path / "settings.json"
         settings_path.write_text(
@@ -446,10 +446,10 @@ class TestTextInserterDialogSettings:
         )
 
         with patch(
-            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            "tachograph_wizard.ui.settings_manager._get_settings_path",
             return_value=settings_path,
         ):
-            _save_window_size(600, 700)
+            save_window_size(600, 700)
 
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert data["other_setting"] == "value"
