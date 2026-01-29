@@ -602,6 +602,7 @@ class TestTextInserterDialogCancel:
                     if layer.is_valid():
                         mock_image.remove_layer(layer)
                 except Exception:
+                    # Ignore errors during best-effort cleanup of inserted layers.
                     pass
             gimp_mock.displays_flush()
 

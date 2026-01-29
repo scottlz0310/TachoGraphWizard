@@ -940,6 +940,6 @@ class TextInserterDialog(GimpUi.Dialog):
                 try:
                     if layer.is_valid():
                         self.image.remove_layer(layer)
-                except Exception:
-                    pass
+                except Exception as e:
+                    _debug_log(f"WARNING: Failed to remove layer during finalize_response: {e}")
             Gimp.displays_flush()
