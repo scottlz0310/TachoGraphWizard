@@ -11,9 +11,37 @@ GIMP 3向けのタコグラフチャート処理プラグイン（分割・背�
 - 依存関係: Python 3.12+ / GIMP 3.0.6
 - 開発環境: `uv sync`
 
+## 品質確保（必須）
+コードを変更する際は、以下の全てのチェックが成功することを確認してください。
+
+```bash
+# フォーマットチェック
+uv run ruff format --check .
+
+# Lintチェック
+uv run ruff check .
+
+# 型チェック
+uv run basedpyright
+
+# テスト実行
+uv run pytest tests/
+```
+
+または、一括で実行する場合:
+```bash
+uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest tests/
+```
+
+**注意**: PRをマージする前に、上記全てのチェックが成功することを確認してください。CIでも同様のチェックが実行されます。
+
 ## よく使うコマンド
-- Lint: `.\.venv\Scripts\ruff.exe check .`
-- 型チェック: `uv run basedpyright`（必要時）
+- フォーマット: `uv run ruff format .`
+- Lint: `uv run ruff check .`
+- Lint（自動修正）: `uv run ruff check . --fix`
+- 型チェック: `uv run basedpyright`
+- テスト: `uv run pytest tests/`
+- テスト（カバレッジ付き）: `uv run pytest tests/ --cov=src --cov-report=term-missing`
 
 ## プラグイン導入（Windows）
 - GIMPプラグインディレクトリ: `%APPDATA%\GIMP\3.0\plug-ins`
