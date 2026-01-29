@@ -56,11 +56,17 @@ class TestFilenameGenerator:
         assert result == "20250101_AB-123_Taro-Yamada.png"
 
     def test_generate_filename_default_date(self) -> None:
-        """Test filename generation with default (today) date."""
-        today = datetime.date.today()
-        result = generate_filename(vehicle_number="123")
-        expected_date = today.strftime("%Y%m%d")
-        assert result == f"{expected_date}_123.png"
+        """Test filename generation with default (today) date.
+
+        Uses a fixed date to avoid time-of-day race conditions.
+        """
+        from unittest.mock import patch
+
+        fixed_date = datetime.date(2025, 6, 15)
+        with patch("tachograph_wizard.core.filename_generator.datetime") as mock_datetime:
+            mock_datetime.date.today.return_value = fixed_date
+            result = generate_filename(vehicle_number="123")
+            assert result == "20250615_123.png"
 
     def test_generate_filename_custom_extension(self) -> None:
         """Test filename generation with custom extension."""
@@ -101,8 +107,14 @@ class TestFilenameGenerator:
         assert result == "20250101.png"
 
     def test_generate_filename_none_date(self) -> None:
-        """Test that None date defaults to today."""
-        result = generate_filename(date=None, vehicle_number="123")
-        today = datetime.date.today()
-        expected_date = today.strftime("%Y%m%d")
-        assert result == f"{expected_date}_123.png"
+        """Test that None date defaults to today.
+
+        Uses a fixed date to avoid time-of-day race conditions.
+        """
+        from unittest.mock import patch
+
+        fixed_date = datetime.date(2025, 6, 15)
+        with patch("tachograph_wizard.core.filename_generator.datetime") as mock_datetime:
+            mock_datetime.date.today.return_value = fixed_date
+            result = generate_filename(date=None, vehicle_number="123")
+            assert result == "20250615_123.png"

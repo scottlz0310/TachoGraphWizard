@@ -16,7 +16,7 @@ gi.require_version("Gio", "2.0")
 
 from gi.repository import Gimp, Gio, GObject
 
-from tachograph_wizard.core.filename_generator import generate_filename
+from tachograph_wizard.core import filename_generator
 from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 
 
@@ -238,7 +238,7 @@ class Exporter:
         Returns:
             Generated filename string.
         """
-        return generate_filename(
+        return filename_generator.generate_filename(
             date=date,
             vehicle_number=vehicle_number,
             driver_name=driver_name,

@@ -1,7 +1,7 @@
 """Filename generation module for tachograph chart exports.
 
-純粋関数としてファイル名を生成するモジュール。
-副作用を持たず、テスト容易性を重視した設計。
+日付や車両番号などからファイル名を生成するモジュール。
+日付を指定しない場合は実行時の「今日」を使用しつつ、副作用を最小限に抑えテスト容易性を重視した設計。
 """
 
 from __future__ import annotations
