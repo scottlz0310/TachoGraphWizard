@@ -7,6 +7,13 @@
 - **Text Inserterに保存UI実装**: Issue #30でText Inserterダイアログに保存機能を実装
 - **ファイル名フィールド選択の永続化**: Text Inserterのファイル名に含めるフィールドの選択状態を保存
 - **ウィンドウサイズの永続化**: Text Inserterのウィンドウサイズを保存し、次回起動時に復元
+- **キャンセルボタンのUndo対応**: Text Inserterダイアログでキャンセル時に変更を元に戻す機能を追加
+
+### 修正
+- **型チェックエラーの解消**: basedpyright設定にGObject Introspection向けの例外を追加（`reportAttributeAccessIssue`、`reportUnnecessaryComparison`）
+
+### ドキュメント
+- **AGENTTS.md品質確保セクション追加**: format、lint、typecheck、testsの全チェック実行を義務化
 
 ### 削除
 - **Chart Wizardから保存UI削除**: Text Inserterに保存機能が移行したため、Chart Wizardの保存セクション（Step 3）を削除

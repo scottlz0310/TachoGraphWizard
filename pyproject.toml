@@ -153,6 +153,7 @@ reportUnknownMemberType = false
 reportUnknownParameterType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
+reportAttributeAccessIssue = false  # gi.repository dynamic imports have no type stubs
 # Enable other strict checks
 reportUnusedImport = true
 reportUnusedClass = true

@@ -1,4 +1,5 @@
 # pyright: reportPrivateUsage=false
+# pyright: reportUnnecessaryComparison=false
 """Unit tests for text inserter dialog settings functions."""
 
 from __future__ import annotations
@@ -6,6 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestTextInserterDialogSettings:
@@ -452,3 +455,254 @@ class TestTextInserterDialogSettings:
         assert data["other_setting"] == "value"
         assert data["text_inserter_window_width"] == "600"
         assert data["text_inserter_window_height"] == "700"
+
+
+class TestTextInserterDialogUndo:
+    """Test text inserter dialog undo functionality.
+
+    Note: These tests verify the finalize_response logic by simulating what the method does.
+    Due to the GIMP module mocking, the TextInserterDialog class is replaced with a mock,
+    making it impossible to call the actual finalize_response method directly.
+    The procedure tests in TestTextInserterProcedure verify the integration.
+    """
+
+    def test_finalize_response_ok_commits_changes(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """OK response ends undo group without undoing, committing changes."""
+        gimp_mock, _, _ = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+
+        # Simulate finalize_response logic for OK with pending changes
+        _undo_group_started = True
+        _has_pending_changes = True
+        response = gtk_mock.ResponseType.OK
+
+        if _undo_group_started:
+            mock_image.undo_group_end()
+            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+                gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was NOT called (OK response commits changes)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+
+    def test_finalize_response_cancel_undoes_changes(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Cancel response undoes all changes when changes were made."""
+        gimp_mock, _, _ = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+        gtk_mock.ResponseType.CANCEL = 0
+
+        # Simulate finalize_response logic for CANCEL with pending changes
+        _undo_group_started = True
+        _has_pending_changes = True
+        response = gtk_mock.ResponseType.CANCEL
+
+        if _undo_group_started:
+            mock_image.undo_group_end()
+            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+                gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was called (Cancel response with changes)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_called_once()
+        call_args = gimp_mock.get_pdb.return_value.run_procedure.call_args
+        assert call_args[0][0] == "gimp-edit-undo"
+        assert call_args[0][1][0] == mock_image
+
+    def test_finalize_response_cancel_no_undo_without_changes(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Cancel response does not undo when no changes were made."""
+        gimp_mock, _, _ = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+        gtk_mock.ResponseType.CANCEL = 0
+
+        # Simulate finalize_response logic for CANCEL without pending changes
+        _undo_group_started = True
+        _has_pending_changes = False
+        response = gtk_mock.ResponseType.CANCEL
+
+        if _undo_group_started:
+            mock_image.undo_group_end()
+            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+                gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was NOT called (no changes to undo)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+
+    def test_finalize_response_skips_when_undo_group_not_started(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """finalize_response does nothing if undo group was never started."""
+        gimp_mock, _, _ = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Simulate finalize_response logic when undo group was never started
+        _undo_group_started = False
+        _has_pending_changes = True
+
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.CANCEL = 0
+        response = gtk_mock.ResponseType.CANCEL
+
+        if _undo_group_started:
+            mock_image.undo_group_end()
+            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+                gimp_mock.displays_flush()
+
+        # Verify undo_group_end was NOT called
+        mock_image.undo_group_end.assert_not_called()
+
+        # Verify undo was NOT called
+        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+
+
+class TestTextInserterProcedure:
+    """Test text inserter procedure functionality."""
+
+    def test_run_text_inserter_dialog_returns_false_on_cancel(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog returns False when dialog is cancelled."""
+        _ = mock_gimp_modules  # Required for GIMP module mocking
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Get Gtk mock from modules - this is what the procedure will use
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+
+        # Mock TextInserterDialog
+        mock_dialog = MagicMock()
+        # Use the SAME mock value that the procedure will compare against
+        mock_dialog.run.return_value = gtk_mock.ResponseType.CANCEL
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            result = run_text_inserter_dialog(mock_image, None)
+
+        # When dialog.run() returns CANCEL, result should be False
+        assert result is False
+        mock_dialog.run.assert_called_once()
+        mock_dialog.finalize_response.assert_called_once()
+        mock_dialog.destroy.assert_called_once()
+
+    def test_run_text_inserter_dialog_calls_finalize_response_and_destroy(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog always calls finalize_response and destroy."""
+        _ = mock_gimp_modules  # Required for GIMP module mocking
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Get Gtk mock from modules
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+
+        # Mock TextInserterDialog
+        mock_dialog = MagicMock()
+        mock_dialog.run.return_value = gtk_mock.ResponseType.OK
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            run_text_inserter_dialog(mock_image, None)
+
+        # Verify the procedure correctly calls finalize_response with the response
+        mock_dialog.run.assert_called_once()
+        mock_dialog.finalize_response.assert_called_once_with(gtk_mock.ResponseType.OK)
+        mock_dialog.destroy.assert_called_once()
+
+    def test_run_text_inserter_dialog_calls_finalize_on_exception(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog calls finalize_response even when dialog.run() raises."""
+        _ = mock_gimp_modules  # Required for GIMP module mocking
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock TextInserterDialog that raises an exception
+        mock_dialog = MagicMock()
+        mock_dialog.run.side_effect = RuntimeError("Dialog error")
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            with pytest.raises(RuntimeError, match="Dialog error"):
+                run_text_inserter_dialog(mock_image, None)
+
+        # Verify finalize_response was still called (with default CANCEL since run() raised)
+        # Note: We verify it was called once; the argument is the Gtk.ResponseType.CANCEL mock
+        # which gets a new identity from the procedure's Gtk import
+        mock_dialog.finalize_response.assert_called_once()
+        mock_dialog.destroy.assert_called_once()

@@ -24,7 +24,11 @@ def run_text_inserter_dialog(image: Gimp.Image, _drawable: Gimp.Drawable | None)
     from tachograph_wizard.ui.text_inserter_dialog import TextInserterDialog
 
     dialog = TextInserterDialog(image)
-    response = dialog.run()
-    dialog.destroy()
+    response = Gtk.ResponseType.CANCEL  # Default to CANCEL in case of exception
+    try:
+        response = dialog.run()
+    finally:
+        dialog.finalize_response(response)
+        dialog.destroy()
 
     return response == Gtk.ResponseType.OK
