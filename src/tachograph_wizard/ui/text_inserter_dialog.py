@@ -242,6 +242,10 @@ class TextInserterDialog(GimpUi.Dialog):
         self.output_dir = _load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
         self._resize_save_timeout_id: int | None = None
+        self._has_pending_changes = False  # Track if any text insertions were made
+
+        # Start undo group to allow cancellation of all changes
+        self.image.undo_group_start()
 
         # Load and set window size
         width, height = _load_window_size()
@@ -757,6 +761,10 @@ class TextInserterDialog(GimpUi.Dialog):
             )
             layers = renderer.render_from_csv_row(row_data)
 
+            # Track that changes were made
+            if layers:
+                self._has_pending_changes = True
+
             # Flush displays
             Gimp.displays_flush()
 
@@ -918,3 +926,22 @@ class TextInserterDialog(GimpUi.Dialog):
         error_dialog.destroy()
 
         self.status_label.set_text(f"Error: {message}")
+
+    def finalize_response(self, response: Gtk.ResponseType) -> None:
+        """Finalize the dialog response by handling undo group.
+
+        Call this method after dialog.run() returns and before destroy().
+        If the user clicked Cancel, this undoes all changes made during the session.
+        If the user clicked OK, changes are committed.
+
+        Args:
+            response: The dialog response type (OK, CANCEL, etc.)
+        """
+        # End the undo group first
+        self.image.undo_group_end()
+
+        # If cancelled and changes were made, undo them
+        if response != Gtk.ResponseType.OK and self._has_pending_changes:
+            # Undo the entire group
+            Gimp.get_pdb().run_procedure("gimp-edit-undo", [self.image])
+            Gimp.displays_flush()

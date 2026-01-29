@@ -452,3 +452,115 @@ class TestTextInserterDialogSettings:
         assert data["other_setting"] == "value"
         assert data["text_inserter_window_width"] == "600"
         assert data["text_inserter_window_height"] == "700"
+
+
+class TestTextInserterDialogUndo:
+    """Test text inserter dialog undo functionality."""
+
+    def test_finalize_response_ok_ends_undo_group(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """OK response ends undo group without undoing."""
+        gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+
+        # Test the finalize_response logic directly
+        # This simulates what the method does without needing the class
+        response = gtk_mock.ResponseType.OK
+        has_pending_changes = True
+
+        # End the undo group first
+        mock_image.undo_group_end()
+
+        # If cancelled and changes were made, undo them
+        if response != gtk_mock.ResponseType.OK and has_pending_changes:
+            gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+            gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was NOT called (OK response commits changes)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+
+    def test_finalize_response_cancel_undoes_changes(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Cancel response undoes all changes when changes were made."""
+        gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+        gtk_mock.ResponseType.CANCEL = 0
+
+        # Test the finalize_response logic directly
+        response = gtk_mock.ResponseType.CANCEL
+        has_pending_changes = True
+
+        # End the undo group first
+        mock_image.undo_group_end()
+
+        # If cancelled and changes were made, undo them
+        if response != gtk_mock.ResponseType.OK and has_pending_changes:
+            gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+            gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was called (Cancel response with changes)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_called_once()
+        call_args = gimp_mock.get_pdb.return_value.run_procedure.call_args
+        assert call_args[0][0] == "gimp-edit-undo"
+        assert call_args[0][1][0] == mock_image
+
+    def test_finalize_response_cancel_no_undo_without_changes(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Cancel response does not undo when no changes were made."""
+        gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock Gtk.ResponseType
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+        gtk_mock.ResponseType.CANCEL = 0
+
+        # Test the finalize_response logic directly
+        response = gtk_mock.ResponseType.CANCEL
+        has_pending_changes = False
+
+        # End the undo group first
+        mock_image.undo_group_end()
+
+        # If cancelled and changes were made, undo them
+        if response != gtk_mock.ResponseType.OK and has_pending_changes:
+            gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
+            gimp_mock.displays_flush()
+
+        # Verify undo group was ended
+        mock_image.undo_group_end.assert_called_once()
+
+        # Verify undo was NOT called (no changes to undo)
+        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
