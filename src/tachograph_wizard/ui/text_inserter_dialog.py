@@ -13,8 +13,9 @@ import gi
 gi.require_version("Gimp", "3.0")
 gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
+gi.require_version("GLib", "2.0")
 
-from gi.repository import Gimp, GimpUi, Gtk
+from gi.repository import Gimp, GimpUi, GLib, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
 from tachograph_wizard.core.exporter import Exporter
@@ -181,7 +182,10 @@ def _load_filename_fields() -> list[str]:
             if isinstance(fields, list):
                 return fields
         except json.JSONDecodeError:
-            pass
+            _debug_log(
+                "Invalid JSON in 'text_inserter_filename_fields' setting; "
+                "falling back to default value."
+            )
     return ["date"]  # Default: only date is selected
 
 
@@ -240,6 +244,7 @@ class TextInserterDialog(GimpUi.Dialog):
         self.last_csv_path = _load_csv_path()
         self.output_dir = _load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
+        self._resize_save_timeout_id: int | None = None
 
         # Load and set window size
         width, height = _load_window_size()
@@ -864,7 +869,11 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error(f"Failed to save image: {e}")
 
     def _on_configure_event(self, widget: Gtk.Widget, event: object) -> bool:
-        """Save window size when it changes.
+        """Save window size when it changes (with debouncing).
+
+        This method is called frequently during window resizing. To avoid
+        excessive file I/O, we use a debouncing mechanism that delays the
+        actual save operation until 500ms after the last resize event.
 
         Args:
             widget: The widget that received the event.
@@ -873,9 +882,27 @@ class TextInserterDialog(GimpUi.Dialog):
         Returns:
             False to allow the event to propagate.
         """
+        # Cancel any pending save operation
+        if self._resize_save_timeout_id is not None:
+            GLib.source_remove(self._resize_save_timeout_id)
+
+        # Schedule a new save operation after 500ms of inactivity
+        self._resize_save_timeout_id = GLib.timeout_add(
+            500,  # milliseconds
+            self._save_window_size_delayed,
+        )
+        return False
+
+    def _save_window_size_delayed(self) -> bool:
+        """Callback to save window size after debounce delay.
+
+        Returns:
+            False to prevent the timeout from repeating.
+        """
         width, height = self.get_size()
         _save_window_size(width, height)
-        return False
+        self._resize_save_timeout_id = None
+        return False  # Return False to stop the timeout from repeating
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.
