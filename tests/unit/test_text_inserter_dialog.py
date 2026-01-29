@@ -457,8 +457,8 @@ class TestTextInserterDialogSettings:
         assert data["text_inserter_window_height"] == "700"
 
 
-class TestTextInserterDialogUndo:
-    """Test text inserter dialog undo functionality.
+class TestTextInserterDialogCancel:
+    """Test text inserter dialog cancel functionality.
 
     Note: These tests verify the finalize_response logic by simulating what the method does.
     Due to the GIMP module mocking, the TextInserterDialog class is replaced with a mock,
@@ -466,12 +466,18 @@ class TestTextInserterDialogUndo:
     The procedure tests in TestTextInserterProcedure verify the integration.
     """
 
-    def test_finalize_response_ok_commits_changes(
+    def test_finalize_response_ok_keeps_layers(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
-        """OK response ends undo group without undoing, committing changes."""
+        """OK response keeps all inserted layers."""
         gimp_mock, _, _ = mock_gimp_modules
+
+        # Create mock layers
+        mock_layer1 = MagicMock()
+        mock_layer1.is_valid.return_value = True
+        mock_layer2 = MagicMock()
+        mock_layer2.is_valid.return_value = True
 
         # Create a mock image
         mock_image = MagicMock()
@@ -482,32 +488,31 @@ class TestTextInserterDialogUndo:
         gtk_mock = sys.modules["gi.repository.Gtk"]
         gtk_mock.ResponseType.OK = 1
 
-        # Simulate finalize_response logic for OK with pending changes
-        _undo_group_started = True
-        _has_pending_changes = True
+        # Simulate finalize_response logic for OK with inserted layers
+        _inserted_layers = [mock_layer1, mock_layer2]
         response = gtk_mock.ResponseType.OK
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                try:
-                    mock_image.undo()
-                    gimp_mock.displays_flush()
-                except Exception:
-                    pass
+        if response != gtk_mock.ResponseType.OK and _inserted_layers:
+            for layer in _inserted_layers:
+                if layer.is_valid():
+                    mock_image.remove_layer(layer)
+            gimp_mock.displays_flush()
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
+        # Verify layers were NOT removed (OK response keeps changes)
+        mock_image.remove_layer.assert_not_called()
 
-        # Verify undo was NOT called (OK response commits changes)
-        mock_image.undo.assert_not_called()
-
-    def test_finalize_response_cancel_undoes_changes(
+    def test_finalize_response_cancel_removes_layers(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
-        """Cancel response undoes all changes when changes were made."""
+        """Cancel response removes all inserted layers."""
         gimp_mock, _, _ = mock_gimp_modules
+
+        # Create mock layers
+        mock_layer1 = MagicMock()
+        mock_layer1.is_valid.return_value = True
+        mock_layer2 = MagicMock()
+        mock_layer2.is_valid.return_value = True
 
         # Create a mock image
         mock_image = MagicMock()
@@ -519,32 +524,25 @@ class TestTextInserterDialogUndo:
         gtk_mock.ResponseType.OK = 1
         gtk_mock.ResponseType.CANCEL = 0
 
-        # Simulate finalize_response logic for CANCEL with pending changes
-        _undo_group_started = True
-        _has_pending_changes = True
+        # Simulate finalize_response logic for CANCEL with inserted layers
+        _inserted_layers = [mock_layer1, mock_layer2]
         response = gtk_mock.ResponseType.CANCEL
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                try:
-                    mock_image.undo()
-                    gimp_mock.displays_flush()
-                except Exception:
-                    pass
+        if response != gtk_mock.ResponseType.OK and _inserted_layers:
+            for layer in _inserted_layers:
+                if layer.is_valid():
+                    mock_image.remove_layer(layer)
+            gimp_mock.displays_flush()
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
-
-        # Verify undo was called (Cancel response with changes)
-        mock_image.undo.assert_called_once()
+        # Verify layers were removed (Cancel response removes changes)
+        assert mock_image.remove_layer.call_count == 2
         gimp_mock.displays_flush.assert_called_once()
 
-    def test_finalize_response_cancel_no_undo_without_changes(
+    def test_finalize_response_cancel_no_action_without_layers(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
-        """Cancel response does not undo when no changes were made."""
+        """Cancel response does nothing when no layers were inserted."""
         gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
@@ -557,48 +555,58 @@ class TestTextInserterDialogUndo:
         gtk_mock.ResponseType.OK = 1
         gtk_mock.ResponseType.CANCEL = 0
 
-        # Simulate finalize_response logic for CANCEL without pending changes
-        _undo_group_started = True
-        _has_pending_changes = False
+        # Simulate finalize_response logic for CANCEL without inserted layers
+        _inserted_layers: list[MagicMock] = []
         response = gtk_mock.ResponseType.CANCEL
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                try:
-                    mock_image.undo()
-                    gimp_mock.displays_flush()
-                except Exception:
-                    pass
+        if response != gtk_mock.ResponseType.OK and _inserted_layers:
+            for layer in _inserted_layers:
+                if layer.is_valid():
+                    mock_image.remove_layer(layer)
+            gimp_mock.displays_flush()
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
+        # Verify no layer removal was attempted
+        mock_image.remove_layer.assert_not_called()
+        gimp_mock.displays_flush.assert_not_called()
 
-        # Verify undo was NOT called (no changes to undo)
-        mock_image.undo.assert_not_called()
-
-    def test_finalize_response_skips_when_undo_group_not_started(
+    def test_finalize_response_cancel_skips_invalid_layers(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
-        """finalize_response does nothing if undo group was never started."""
-        _, _, _ = mock_gimp_modules
+        """Cancel response skips layers that are no longer valid."""
+        gimp_mock, _, _ = mock_gimp_modules
+
+        # Create mock layers - one valid, one invalid
+        mock_layer_valid = MagicMock()
+        mock_layer_valid.is_valid.return_value = True
+        mock_layer_invalid = MagicMock()
+        mock_layer_invalid.is_valid.return_value = False
 
         # Create a mock image
         mock_image = MagicMock()
 
-        # Simulate finalize_response logic when undo group was never started
-        _undo_group_started = False
-        _has_pending_changes = True
+        # Mock Gtk.ResponseType
+        import sys
 
-        # In this scenario, the undo group was never started, so no undo
-        # operations should be performed.
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+        gtk_mock.ResponseType.OK = 1
+        gtk_mock.ResponseType.CANCEL = 0
 
-        # Verify undo_group_end was NOT called
-        mock_image.undo_group_end.assert_not_called()
+        # Simulate finalize_response logic for CANCEL
+        _inserted_layers = [mock_layer_valid, mock_layer_invalid]
+        response = gtk_mock.ResponseType.CANCEL
 
-        # Verify undo was NOT called
-        mock_image.undo.assert_not_called()
+        if response != gtk_mock.ResponseType.OK and _inserted_layers:
+            for layer in _inserted_layers:
+                try:
+                    if layer.is_valid():
+                        mock_image.remove_layer(layer)
+                except Exception:
+                    pass
+            gimp_mock.displays_flush()
+
+        # Verify only valid layer was removed
+        mock_image.remove_layer.assert_called_once_with(mock_layer_valid)
 
 
 class TestTextInserterProcedure:

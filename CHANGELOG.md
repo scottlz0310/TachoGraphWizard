@@ -7,7 +7,7 @@
 - **Text Inserterに保存UI実装**: Issue #30でText Inserterダイアログに保存機能を実装
 - **ファイル名フィールド選択の永続化**: Text Inserterのファイル名に含めるフィールドの選択状態を保存
 - **ウィンドウサイズの永続化**: Text Inserterのウィンドウサイズを保存し、次回起動時に復元
-- **キャンセルボタンのUndo対応**: Text Inserterダイアログでキャンセル時に変更を元に戻す機能を追加
+- **キャンセルボタン対応**: Text Inserterダイアログでキャンセル時に挿入したレイヤーを削除する機能を追加
 
 ### 修正
 - **型チェックエラーの解消**: basedpyright設定にGObject Introspection向けの例外を追加（`reportAttributeAccessIssue`、`reportUnnecessaryComparison`）
