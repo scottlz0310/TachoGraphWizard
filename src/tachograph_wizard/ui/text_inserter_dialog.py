@@ -18,6 +18,7 @@ from gi.repository import Gimp, GimpUi, GLib, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
 from tachograph_wizard.core.exporter import Exporter
+from tachograph_wizard.core.filename_generator import generate_filename
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_renderer import TextRenderer
 from tachograph_wizard.ui.settings_manager import (
@@ -651,7 +652,7 @@ class TextInserterDialog(GimpUi.Dialog):
         selected_fields = self._get_selected_filename_fields()
         selected_date = self._get_selected_date()
 
-        return Exporter.generate_filename(
+        return generate_filename(
             date=selected_date,
             vehicle_number=row_data.get("vehicle_no", "") if "vehicle_no" in selected_fields else "",
             driver_name=row_data.get("driver", "") if "driver" in selected_fields else "",

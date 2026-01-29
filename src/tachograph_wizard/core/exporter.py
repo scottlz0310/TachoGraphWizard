@@ -16,6 +16,7 @@ gi.require_version("Gio", "2.0")
 
 from gi.repository import Gimp, Gio, GObject
 
+from tachograph_wizard.core import filename_generator
 from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 
 
@@ -222,6 +223,9 @@ class Exporter:
     ) -> str:
         """Generate filename following naming convention.
 
+        This is a wrapper around core.filename_generator.generate_filename()
+        for backward compatibility.
+
         Format: YYYYMMDD_車番_運転手.png
         Example: 20250101_123_TaroYamada.png
 
@@ -234,29 +238,12 @@ class Exporter:
         Returns:
             Generated filename string.
         """
-        if date is None:
-            date = datetime.date.today()
-
-        date_str = date.strftime("%Y%m%d")
-        parts = [date_str]
-
-        if vehicle_number:
-            # Sanitize vehicle number (replace spaces with underscores)
-            vehicle_clean = vehicle_number.replace(" ", "_").replace("/", "-")
-            parts.append(vehicle_clean)
-
-        if driver_name:
-            # Sanitize driver name (remove spaces and special characters)
-            driver_clean = (
-                driver_name.replace(" ", "")
-                .replace("　", "")  # Remove full-width space
-                .replace("/", "-")
-                .replace("\\", "-")
-            )
-            parts.append(driver_clean)
-
-        filename = "_".join(parts) + f".{extension}"
-        return filename
+        return filename_generator.generate_filename(
+            date=date,
+            vehicle_number=vehicle_number,
+            driver_name=driver_name,
+            extension=extension,
+        )
 
     @staticmethod
     def save_with_naming_convention(
