@@ -166,6 +166,29 @@ class TestTextInserterDialogSettings:
 
         assert result == output_dir
 
+    def test_load_output_dir_returns_none_for_nonexistent_path(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load output directory returns None when saved path doesn't exist."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_output_dir
+
+        # Create settings file with non-existent path
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"text_inserter_output_dir": str(tmp_path / "nonexistent_dir")}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            result = _load_output_dir()
+
+        assert result is None
+
     def test_save_output_dir_creates_settings_file(
         self,
         tmp_path: Path,

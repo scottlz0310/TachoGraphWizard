@@ -58,146 +58,109 @@ def _get_settings_path() -> Path:
     return Path(base) / "tachograph_wizard" / "settings.json"
 
 
-def _load_last_used_date() -> datetime.date | None:
+def _load_setting(key: str) -> str | None:
+    """Load a setting value from the settings file.
+
+    Args:
+        key: The setting key to load.
+
+    Returns:
+        The setting value as a string, or None if not found.
+    """
     settings_path = _get_settings_path()
     try:
         with settings_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-        value = data.get("text_inserter_last_date")
-        if value:
-            return datetime.date.fromisoformat(value)
+        return data.get(key)
     except FileNotFoundError:
         return None
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
         _debug_log(f"WARNING: Failed to read settings: {exc}")
+    return None
+
+
+def _save_setting(key: str, value: str) -> None:
+    """Save a setting value to the settings file.
+
+    Args:
+        key: The setting key to save.
+        value: The setting value to save.
+    """
+    settings_path = _get_settings_path()
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if settings_path.exists():
+            try:
+                with settings_path.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                data = {}
+        data[key] = value
+        with settings_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=True, indent=2)
+    except Exception as exc:
+        _debug_log(f"WARNING: Failed to save settings: {exc}")
+
+
+def _load_path_setting(key: str) -> Path | None:
+    """Load a path setting from the settings file.
+
+    Args:
+        key: The setting key to load.
+
+    Returns:
+        The path if it exists, or None otherwise.
+    """
+    value = _load_setting(key)
+    if value:
+        candidate = Path(value)
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _load_last_used_date() -> datetime.date | None:
+    value = _load_setting("text_inserter_last_date")
+    if value:
+        try:
+            return datetime.date.fromisoformat(value)
+        except (TypeError, ValueError) as exc:
+            _debug_log(f"WARNING: Failed to parse date: {exc}")
     return None
 
 
 def _save_last_used_date(selected_date: datetime.date) -> None:
-    settings_path = _get_settings_path()
-    try:
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, str] = {}
-        if settings_path.exists():
-            try:
-                with settings_path.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
-                data = {}
-        data["text_inserter_last_date"] = selected_date.isoformat()
-        with settings_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
-    except Exception as exc:
-        _debug_log(f"WARNING: Failed to save settings: {exc}")
+    _save_setting("text_inserter_last_date", selected_date.isoformat())
 
 
 def _load_template_dir(default_dir: Path) -> Path:
-    settings_path = _get_settings_path()
-    try:
-        with settings_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        value = data.get("text_inserter_template_dir")
-        if value:
-            candidate = Path(value)
-            if candidate.exists():
-                return candidate
-    except FileNotFoundError:
-        return default_dir
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
-        _debug_log(f"WARNING: Failed to read settings: {exc}")
-    return default_dir
+    result = _load_path_setting("text_inserter_template_dir")
+    return result if result else default_dir
 
 
 def _save_template_dir(selected_dir: Path) -> None:
-    settings_path = _get_settings_path()
-    try:
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, str] = {}
-        if settings_path.exists():
-            try:
-                with settings_path.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
-                data = {}
-        data["text_inserter_template_dir"] = str(selected_dir)
-        with settings_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
-    except Exception as exc:
-        _debug_log(f"WARNING: Failed to save settings: {exc}")
+    _save_setting("text_inserter_template_dir", str(selected_dir))
 
 
 def _load_csv_path() -> Path | None:
     """Load the last used CSV file path from settings."""
-    settings_path = _get_settings_path()
-    try:
-        with settings_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        value = data.get("text_inserter_csv_path")
-        if value:
-            candidate = Path(value)
-            if candidate.exists():
-                return candidate
-    except FileNotFoundError:
-        return None
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
-        _debug_log(f"WARNING: Failed to read settings: {exc}")
-    return None
+    return _load_path_setting("text_inserter_csv_path")
 
 
 def _save_csv_path(csv_path: Path) -> None:
     """Save the CSV file path to settings."""
-    settings_path = _get_settings_path()
-    try:
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, str] = {}
-        if settings_path.exists():
-            try:
-                with settings_path.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
-                data = {}
-        data["text_inserter_csv_path"] = str(csv_path)
-        with settings_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
-    except Exception as exc:
-        _debug_log(f"WARNING: Failed to save settings: {exc}")
+    _save_setting("text_inserter_csv_path", str(csv_path))
 
 
 def _load_output_dir() -> Path | None:
     """Load the last used output directory from settings."""
-    settings_path = _get_settings_path()
-    try:
-        with settings_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        value = data.get("text_inserter_output_dir")
-        if value:
-            candidate = Path(value)
-            if candidate.exists():
-                return candidate
-    except FileNotFoundError:
-        return None
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
-        _debug_log(f"WARNING: Failed to read settings: {exc}")
-    return None
+    return _load_path_setting("text_inserter_output_dir")
 
 
 def _save_output_dir(output_dir: Path) -> None:
     """Save the output directory to settings."""
-    settings_path = _get_settings_path()
-    try:
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, str] = {}
-        if settings_path.exists():
-            try:
-                with settings_path.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
-                data = {}
-        data["text_inserter_output_dir"] = str(output_dir)
-        with settings_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
-    except Exception as exc:
-        _debug_log(f"WARNING: Failed to save settings: {exc}")
+    _save_setting("text_inserter_output_dir", str(output_dir))
 
 
 def _parse_date_string(value: str) -> datetime.date | None:
