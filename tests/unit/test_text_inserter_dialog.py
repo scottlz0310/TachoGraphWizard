@@ -487,17 +487,24 @@ class TestTextInserterDialogUndo:
         _has_pending_changes = True
         response = gtk_mock.ResponseType.OK
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
-                gimp_mock.displays_flush()
+        # Mock run_pdb_procedure
+        with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
+            if _undo_group_started:
+                mock_image.undo_group_end()
+                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                    from gi.repository import GObject
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
+                    mock_run_pdb(
+                        "gimp-edit-undo",
+                        [GObject.Value(gimp_mock.Image, mock_image)],
+                    )
+                    gimp_mock.displays_flush()
 
-        # Verify undo was NOT called (OK response commits changes)
-        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+            # Verify undo group was ended
+            mock_image.undo_group_end.assert_called_once()
+
+            # Verify undo was NOT called (OK response commits changes)
+            mock_run_pdb.assert_not_called()
 
     def test_finalize_response_cancel_undoes_changes(
         self,
@@ -521,20 +528,26 @@ class TestTextInserterDialogUndo:
         _has_pending_changes = True
         response = gtk_mock.ResponseType.CANCEL
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
-                gimp_mock.displays_flush()
+        # Mock run_pdb_procedure
+        with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
+            if _undo_group_started:
+                mock_image.undo_group_end()
+                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                    from gi.repository import GObject
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
+                    mock_run_pdb(
+                        "gimp-edit-undo",
+                        [GObject.Value(gimp_mock.Image, mock_image)],
+                    )
+                    gimp_mock.displays_flush()
 
-        # Verify undo was called (Cancel response with changes)
-        gimp_mock.get_pdb.return_value.run_procedure.assert_called_once()
-        call_args = gimp_mock.get_pdb.return_value.run_procedure.call_args
-        assert call_args[0][0] == "gimp-edit-undo"
-        assert call_args[0][1][0] == mock_image
+            # Verify undo group was ended
+            mock_image.undo_group_end.assert_called_once()
+
+            # Verify undo was called (Cancel response with changes)
+            mock_run_pdb.assert_called_once()
+            call_args = mock_run_pdb.call_args
+            assert call_args[0][0] == "gimp-edit-undo"
 
     def test_finalize_response_cancel_no_undo_without_changes(
         self,
@@ -558,17 +571,24 @@ class TestTextInserterDialogUndo:
         _has_pending_changes = False
         response = gtk_mock.ResponseType.CANCEL
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
-                gimp_mock.displays_flush()
+        # Mock run_pdb_procedure
+        with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
+            if _undo_group_started:
+                mock_image.undo_group_end()
+                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                    from gi.repository import GObject
 
-        # Verify undo group was ended
-        mock_image.undo_group_end.assert_called_once()
+                    mock_run_pdb(
+                        "gimp-edit-undo",
+                        [GObject.Value(gimp_mock.Image, mock_image)],
+                    )
+                    gimp_mock.displays_flush()
 
-        # Verify undo was NOT called (no changes to undo)
-        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+            # Verify undo group was ended
+            mock_image.undo_group_end.assert_called_once()
+
+            # Verify undo was NOT called (no changes to undo)
+            mock_run_pdb.assert_not_called()
 
     def test_finalize_response_skips_when_undo_group_not_started(
         self,
@@ -590,17 +610,24 @@ class TestTextInserterDialogUndo:
         gtk_mock.ResponseType.CANCEL = 0
         response = gtk_mock.ResponseType.CANCEL
 
-        if _undo_group_started:
-            mock_image.undo_group_end()
-            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                gimp_mock.get_pdb().run_procedure("gimp-edit-undo", [mock_image])
-                gimp_mock.displays_flush()
+        # Mock run_pdb_procedure
+        with patch("tachograph_wizard.ui.text_inserter_dialog.run_pdb_procedure") as mock_run_pdb:
+            if _undo_group_started:
+                mock_image.undo_group_end()
+                if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                    from gi.repository import GObject
 
-        # Verify undo_group_end was NOT called
-        mock_image.undo_group_end.assert_not_called()
+                    mock_run_pdb(
+                        "gimp-edit-undo",
+                        [GObject.Value(gimp_mock.Image, mock_image)],
+                    )
+                    gimp_mock.displays_flush()
 
-        # Verify undo was NOT called
-        gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+            # Verify undo_group_end was NOT called
+            mock_image.undo_group_end.assert_not_called()
+
+            # Verify undo was NOT called
+            mock_run_pdb.assert_not_called()
 
 
 class TestTextInserterProcedure:
