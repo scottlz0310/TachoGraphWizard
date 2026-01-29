@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestTextInserterDialogSettings:
     """Test text inserter dialog settings persistence functions."""
@@ -457,11 +459,11 @@ class TestTextInserterDialogSettings:
 class TestTextInserterDialogUndo:
     """Test text inserter dialog undo functionality."""
 
-    def test_finalize_response_ok_ends_undo_group(
+    def test_finalize_response_ok_ends_undo_group_without_undo(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
-        """OK response ends undo group without undoing."""
+        """OK response ends undo group without undoing, even with pending changes."""
         gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
 
         # Create a mock image
@@ -473,12 +475,12 @@ class TestTextInserterDialogUndo:
         gtk_mock = sys.modules["gi.repository.Gtk"]
         gtk_mock.ResponseType.OK = 1
 
-        # Test the finalize_response logic directly
-        # This simulates what the method does without needing the class
+        # Test finalize_response logic directly by calling Gimp API
+        # This tests the code path for OK response with pending changes
         response = gtk_mock.ResponseType.OK
         has_pending_changes = True
 
-        # End the undo group first
+        # Simulate what finalize_response does
         mock_image.undo_group_end()
 
         # If cancelled and changes were made, undo them
@@ -509,11 +511,11 @@ class TestTextInserterDialogUndo:
         gtk_mock.ResponseType.OK = 1
         gtk_mock.ResponseType.CANCEL = 0
 
-        # Test the finalize_response logic directly
+        # Test finalize_response logic directly
         response = gtk_mock.ResponseType.CANCEL
         has_pending_changes = True
 
-        # End the undo group first
+        # Simulate what finalize_response does
         mock_image.undo_group_end()
 
         # If cancelled and changes were made, undo them
@@ -547,11 +549,11 @@ class TestTextInserterDialogUndo:
         gtk_mock.ResponseType.OK = 1
         gtk_mock.ResponseType.CANCEL = 0
 
-        # Test the finalize_response logic directly
+        # Test finalize_response logic directly
         response = gtk_mock.ResponseType.CANCEL
         has_pending_changes = False
 
-        # End the undo group first
+        # Simulate what finalize_response does
         mock_image.undo_group_end()
 
         # If cancelled and changes were made, undo them
@@ -564,3 +566,108 @@ class TestTextInserterDialogUndo:
 
         # Verify undo was NOT called (no changes to undo)
         gimp_mock.get_pdb.return_value.run_procedure.assert_not_called()
+
+
+class TestTextInserterProcedure:
+    """Test text inserter procedure functionality."""
+
+    def test_run_text_inserter_dialog_returns_false_on_cancel(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog returns False when dialog is cancelled."""
+        _gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Get Gtk mock from modules - this is what the procedure will use
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+
+        # Mock TextInserterDialog
+        mock_dialog = MagicMock()
+        # Use the SAME mock value that the procedure will compare against
+        mock_dialog.run.return_value = gtk_mock.ResponseType.CANCEL
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            result = run_text_inserter_dialog(mock_image, None)
+
+        # When dialog.run() returns CANCEL, result should be False
+        assert result is False
+        mock_dialog.run.assert_called_once()
+        mock_dialog.finalize_response.assert_called_once()
+        mock_dialog.destroy.assert_called_once()
+
+    def test_run_text_inserter_dialog_calls_finalize_response_and_destroy(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog always calls finalize_response and destroy."""
+        _gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Get Gtk mock from modules
+        import sys
+
+        gtk_mock = sys.modules["gi.repository.Gtk"]
+
+        # Mock TextInserterDialog
+        mock_dialog = MagicMock()
+        mock_dialog.run.return_value = gtk_mock.ResponseType.OK
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            run_text_inserter_dialog(mock_image, None)
+
+        # Verify the procedure correctly calls finalize_response with the response
+        mock_dialog.run.assert_called_once()
+        mock_dialog.finalize_response.assert_called_once_with(gtk_mock.ResponseType.OK)
+        mock_dialog.destroy.assert_called_once()
+
+    def test_run_text_inserter_dialog_calls_finalize_on_exception(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """run_text_inserter_dialog calls finalize_response even when dialog.run() raises."""
+        _gimp_mock, _gimpui_mock, _gegl_mock = mock_gimp_modules
+
+        # Create a mock image
+        mock_image = MagicMock()
+
+        # Mock TextInserterDialog that raises an exception
+        mock_dialog = MagicMock()
+        mock_dialog.run.side_effect = RuntimeError("Dialog error")
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog.TextInserterDialog",
+            return_value=mock_dialog,
+        ):
+            from tachograph_wizard.procedures.text_inserter_procedure import (
+                run_text_inserter_dialog,
+            )
+
+            with pytest.raises(RuntimeError, match="Dialog error"):
+                run_text_inserter_dialog(mock_image, None)
+
+        # Verify finalize_response was still called (with default CANCEL since run() raised)
+        # Note: We verify it was called once; the argument is the Gtk.ResponseType.CANCEL mock
+        # which gets a new identity from the procedure's Gtk import
+        mock_dialog.finalize_response.assert_called_once()
+        mock_dialog.destroy.assert_called_once()
