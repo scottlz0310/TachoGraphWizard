@@ -179,7 +179,7 @@ class TextInserterDialog(GimpUi.Dialog):
     FILENAME_FIELD_OPTIONS: ClassVar[list[tuple[str, str]]] = [
         ("date", "Date (from calendar)"),
         ("vehicle_no", "Vehicle Number"),
-        ("driver_name", "Driver Name"),
+        ("driver", "Driver Name"),
     ]
 
     def __init__(self, image: Gimp.Image) -> None:
@@ -465,8 +465,12 @@ class TextInserterDialog(GimpUi.Dialog):
         fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
             check = Gtk.CheckButton(label=field_label)
-            # Enable date by default
-            check.set_active(field_key == "date")
+            # Date is always included (mandatory), other fields are optional
+            if field_key == "date":
+                check.set_active(True)
+                check.set_sensitive(False)  # Disable date checkbox - always included
+            else:
+                check.set_active(False)
             check.connect("toggled", self._on_filename_field_toggled)
             self.filename_field_checks[field_key] = check
             fields_box.pack_start(check, False, False, 0)
@@ -738,9 +742,9 @@ class TextInserterDialog(GimpUi.Dialog):
         selected_date = self._get_selected_date()
 
         return Exporter.generate_filename(
-            date=selected_date if "date" in selected_fields else None,
+            date=selected_date,
             vehicle_number=row_data.get("vehicle_no", "") if "vehicle_no" in selected_fields else "",
-            driver_name=row_data.get("driver_name", "") if "driver_name" in selected_fields else "",
+            driver_name=row_data.get("driver", "") if "driver" in selected_fields else "",
         )
 
     def _update_filename_preview(self) -> None:
@@ -796,8 +800,14 @@ class TextInserterDialog(GimpUi.Dialog):
             filename = self._generate_filename_from_row(row_data)
             output_path = output_folder / filename
 
-            # Save the image
-            Exporter.save_png(self.image, output_path, flatten=False)
+            # Save the image using a duplicate so the active image is not modified
+            export_image = self.image.duplicate()
+            try:
+                Exporter.save_png(export_image, output_path, flatten=False)
+            finally:
+                # Best-effort cleanup of the duplicate image
+                if hasattr(export_image, "delete"):
+                    export_image.delete()
 
             _save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Saved: {output_path}")
