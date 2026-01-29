@@ -441,3 +441,58 @@ def _debug_log(message: str) -> None:
 - [Python コーディング規約（PEP 8）](https://peps.python.org/pep-0008/)
 - [Clean Code by Robert C. Martin](https://www.oreilly.com/library/view/clean-code-a/9780136083238/)
 - [Working Effectively with Legacy Code by Michael Feathers](https://www.oreilly.com/library/view/working-effectively-with/0131177052/)
+
+---
+
+## 11. 進捗管理
+
+### 11.1 フェーズ別進捗状況
+
+| フェーズ | 状態 | 開始日 | 完了日 | 担当者 | 備考 |
+|---------|------|--------|--------|--------|------|
+| Phase 1: 設定管理の分離 | ✅ 完了 | 2026-01-29 | 2026-01-29 | - | settings_manager.py, filename_generator.py 作成完了 |
+| Phase 2: 画像分析の分離 | ⏳ 未着手 | - | - | - | - |
+| Phase 3: 背景除去の分離 | ⏳ 未着手 | - | - | - | - |
+
+### 11.2 実施履歴
+
+| 日付 | 内容 | 関連PR/Issue |
+|------|------|-------------|
+| 2026-01-29 | Phase 1 完了: settings_manager.py (242行), filename_generator.py (54行) の作成 | PR #38 |
+| 2026-01-29 | Phase 1 検証: 全テスト (85件) パス、コード品質チェック完了 | 本PR |
+
+### 11.3 Phase 1 完了サマリー
+
+#### 作成されたモジュール
+
+**ui/settings_manager.py (242行)**
+- 設定ファイルの読み書き機能を提供
+- JSON形式での永続化
+- 型ヒント完備
+- 公開API: `load_*()`, `save_*()`, `parse_date_string()`
+
+**core/filename_generator.py (54行)**
+- ファイル名生成ロジックの純粋関数化
+- テスト容易性の向上
+- 公開API: `generate_filename()`
+
+#### 品質指標
+
+- ✅ テスト: 85件すべてパス (filename_generator: 11件, settings関連: 20件含む)
+- ✅ コードカバレッジ: filename_generator 100%, settings_manager 71%
+- ✅ コードフォーマット: ruff format チェック完了
+- ✅ Lint: ruff check クリーン
+- ✅ 型チェック: basedpyright エラー0件
+- ✅ 循環依存: ゼロ
+
+#### 残課題
+
+- text_inserter_dialog.py の行数が802行 (目標450行に対して未達)
+  - 原因: UI作成・イベントハンドラ部分が多い
+  - 対応: Phase 2以降で UI コンポーネントの分離を検討
+
+### 11.4 次回アクション
+
+- [ ] Phase 1 の最終レビュー完了
+- [ ] Phase 2 の着手判断と計画策定
+- [ ] text_inserter_dialog.py のさらなる分割検討
