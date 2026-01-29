@@ -545,7 +545,7 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Cancel response does not undo when no changes were made."""
-        _, _, _ = mock_gimp_modules
+        gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
         mock_image = MagicMock()
@@ -560,9 +560,16 @@ class TestTextInserterDialogUndo:
         # Simulate finalize_response logic for CANCEL without pending changes
         _undo_group_started = True
         _has_pending_changes = False
+        response = gtk_mock.ResponseType.CANCEL
 
         if _undo_group_started:
             mock_image.undo_group_end()
+            if response != gtk_mock.ResponseType.OK and _has_pending_changes:
+                try:
+                    mock_image.undo()
+                    gimp_mock.displays_flush()
+                except Exception:
+                    pass
 
         # Verify undo group was ended
         mock_image.undo_group_end.assert_called_once()
