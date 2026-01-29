@@ -471,6 +471,8 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """OK response ends undo group without undoing, committing changes."""
+        from gi.repository import GObject
+
         gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
@@ -492,8 +494,6 @@ class TestTextInserterDialogUndo:
             if _undo_group_started:
                 mock_image.undo_group_end()
                 if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    from gi.repository import GObject
-
                     mock_run_pdb(
                         "gimp-edit-undo",
                         [GObject.Value(gimp_mock.Image, mock_image)],
@@ -511,6 +511,8 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Cancel response undoes all changes when changes were made."""
+        from gi.repository import GObject
+
         gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
@@ -533,8 +535,6 @@ class TestTextInserterDialogUndo:
             if _undo_group_started:
                 mock_image.undo_group_end()
                 if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    from gi.repository import GObject
-
                     mock_run_pdb(
                         "gimp-edit-undo",
                         [GObject.Value(gimp_mock.Image, mock_image)],
@@ -548,12 +548,16 @@ class TestTextInserterDialogUndo:
             mock_run_pdb.assert_called_once()
             call_args = mock_run_pdb.call_args
             assert call_args[0][0] == "gimp-edit-undo"
+            # Verify the second argument is a list containing a GObject.Value
+            assert len(call_args[0][1]) == 1
 
     def test_finalize_response_cancel_no_undo_without_changes(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Cancel response does not undo when no changes were made."""
+        from gi.repository import GObject
+
         gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
@@ -576,8 +580,6 @@ class TestTextInserterDialogUndo:
             if _undo_group_started:
                 mock_image.undo_group_end()
                 if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    from gi.repository import GObject
-
                     mock_run_pdb(
                         "gimp-edit-undo",
                         [GObject.Value(gimp_mock.Image, mock_image)],
@@ -595,6 +597,8 @@ class TestTextInserterDialogUndo:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """finalize_response does nothing if undo group was never started."""
+        from gi.repository import GObject
+
         gimp_mock, _, _ = mock_gimp_modules
 
         # Create a mock image
@@ -615,8 +619,6 @@ class TestTextInserterDialogUndo:
             if _undo_group_started:
                 mock_image.undo_group_end()
                 if response != gtk_mock.ResponseType.OK and _has_pending_changes:
-                    from gi.repository import GObject
-
                     mock_run_pdb(
                         "gimp-edit-undo",
                         [GObject.Value(gimp_mock.Image, mock_image)],
