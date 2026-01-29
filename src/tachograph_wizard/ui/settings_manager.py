@@ -201,6 +201,7 @@ def load_filename_fields() -> list[str]:
             if isinstance(fields, list):
                 return fields
         except json.JSONDecodeError:
+            # If the stored value is not valid JSON, fall back to the default.
             pass
     return ["date"]  # Default: only date is selected
 

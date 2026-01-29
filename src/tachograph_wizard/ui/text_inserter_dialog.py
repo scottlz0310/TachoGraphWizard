@@ -747,11 +747,11 @@ class TextInserterDialog(GimpUi.Dialog):
         # Schedule a new save operation after 500ms of inactivity
         self._resize_save_timeout_id = GLib.timeout_add(
             500,  # milliseconds
-            self.save_window_size_delayed,
+            self._save_window_size_delayed,
         )
         return False
 
-    def save_window_size_delayed(self) -> bool:
+    def _save_window_size_delayed(self) -> bool:
         """Callback to save window size after debounce delay.
 
         Returns:
