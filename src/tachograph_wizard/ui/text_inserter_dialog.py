@@ -15,10 +15,11 @@ gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GLib", "2.0")
 
-from gi.repository import Gimp, GimpUi, GLib, Gtk
+from gi.repository import Gimp, GimpUi, GLib, GObject, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
 from tachograph_wizard.core.exporter import Exporter
+from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_renderer import TextRenderer
 
@@ -949,6 +950,9 @@ class TextInserterDialog(GimpUi.Dialog):
 
         # If cancelled and changes were made, undo them
         if response != Gtk.ResponseType.OK and self._has_pending_changes:
-            # Undo the entire group
-            Gimp.get_pdb().run_procedure("gimp-edit-undo", [self.image])
+            # Undo the entire group using the compatibility wrapper
+            run_pdb_procedure(
+                "gimp-edit-undo",
+                [GObject.Value(Gimp.Image, self.image)],
+            )
             Gimp.displays_flush()
