@@ -234,3 +234,221 @@ class TestTextInserterDialogSettings:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert data["other_setting"] == "value"
         assert data["text_inserter_output_dir"] == str(output_dir)
+
+    def test_load_filename_fields_returns_default_for_missing_file(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load filename fields returns default when settings file doesn't exist."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=tmp_path / "nonexistent" / "settings.json",
+        ):
+            result = _load_filename_fields()
+
+        assert result == ["date"]
+
+    def test_load_filename_fields_returns_saved_fields(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load filename fields returns saved fields from settings."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+
+        # Create settings file
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"text_inserter_filename_fields": json.dumps(["date", "vehicle_no", "driver"])}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            result = _load_filename_fields()
+
+        assert result == ["date", "vehicle_no", "driver"]
+
+    def test_load_filename_fields_returns_default_for_invalid_json(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load filename fields returns default when saved value is invalid JSON."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_filename_fields
+
+        # Create settings file with invalid JSON
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"text_inserter_filename_fields": "not a json array"}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            result = _load_filename_fields()
+
+        assert result == ["date"]
+
+    def test_save_filename_fields_creates_settings_file(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Save filename fields creates a new settings file."""
+        from tachograph_wizard.ui.text_inserter_dialog import _save_filename_fields
+
+        settings_path = tmp_path / "settings.json"
+        fields = ["date", "vehicle_no"]
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            _save_filename_fields(fields)
+
+        assert settings_path.exists()
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        saved_fields = json.loads(data["text_inserter_filename_fields"])
+        assert saved_fields == ["date", "vehicle_no"]
+
+    def test_save_filename_fields_preserves_existing_settings(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Save filename fields preserves other settings in the file."""
+        from tachograph_wizard.ui.text_inserter_dialog import _save_filename_fields
+
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"other_setting": "value"}),
+            encoding="utf-8",
+        )
+        fields = ["date", "driver"]
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            _save_filename_fields(fields)
+
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        assert data["other_setting"] == "value"
+        saved_fields = json.loads(data["text_inserter_filename_fields"])
+        assert saved_fields == ["date", "driver"]
+
+    def test_load_window_size_returns_default_for_missing_file(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load window size returns default when settings file doesn't exist."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=tmp_path / "nonexistent" / "settings.json",
+        ):
+            result = _load_window_size()
+
+        assert result == (500, 600)
+
+    def test_load_window_size_returns_saved_size(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load window size returns saved size from settings."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+
+        # Create settings file
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"text_inserter_window_width": "800", "text_inserter_window_height": "900"}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            result = _load_window_size()
+
+        assert result == (800, 900)
+
+    def test_load_window_size_returns_default_for_invalid_values(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Load window size returns default when saved values are invalid."""
+        from tachograph_wizard.ui.text_inserter_dialog import _load_window_size
+
+        # Create settings file with invalid values
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"text_inserter_window_width": "not a number", "text_inserter_window_height": "also not"}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            result = _load_window_size()
+
+        assert result == (500, 600)
+
+    def test_save_window_size_creates_settings_file(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Save window size creates a new settings file."""
+        from tachograph_wizard.ui.text_inserter_dialog import _save_window_size
+
+        settings_path = tmp_path / "settings.json"
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            _save_window_size(700, 800)
+
+        assert settings_path.exists()
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        assert data["text_inserter_window_width"] == "700"
+        assert data["text_inserter_window_height"] == "800"
+
+    def test_save_window_size_preserves_existing_settings(
+        self,
+        tmp_path: Path,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Save window size preserves other settings in the file."""
+        from tachograph_wizard.ui.text_inserter_dialog import _save_window_size
+
+        settings_path = tmp_path / "settings.json"
+        settings_path.write_text(
+            json.dumps({"other_setting": "value"}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "tachograph_wizard.ui.text_inserter_dialog._get_settings_path",
+            return_value=settings_path,
+        ):
+            _save_window_size(600, 700)
+
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        assert data["other_setting"] == "value"
+        assert data["text_inserter_window_width"] == "600"
+        assert data["text_inserter_window_height"] == "700"
