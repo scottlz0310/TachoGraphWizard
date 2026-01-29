@@ -13,8 +13,9 @@ import gi
 gi.require_version("Gimp", "3.0")
 gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
+gi.require_version("GLib", "2.0")
 
-from gi.repository import Gimp, GimpUi, Gtk
+from gi.repository import Gimp, GimpUi, GLib, Gtk
 
 from tachograph_wizard.core.csv_parser import CSVParser
 from tachograph_wizard.core.exporter import Exporter
@@ -172,6 +173,42 @@ def _parse_date_string(value: str) -> datetime.date | None:
     return None
 
 
+def _load_filename_fields() -> list[str]:
+    """Load saved filename field selections."""
+    value = _load_setting("text_inserter_filename_fields")
+    if value:
+        try:
+            fields = json.loads(value)
+            if isinstance(fields, list):
+                return fields
+        except json.JSONDecodeError:
+            _debug_log("Invalid JSON in 'text_inserter_filename_fields' setting; falling back to default value.")
+    return ["date"]  # Default: only date is selected
+
+
+def _save_filename_fields(fields: list[str]) -> None:
+    """Save filename field selections."""
+    _save_setting("text_inserter_filename_fields", json.dumps(fields))
+
+
+def _load_window_size() -> tuple[int, int]:
+    """Load saved window size."""
+    width = _load_setting("text_inserter_window_width")
+    height = _load_setting("text_inserter_window_height")
+    try:
+        w = int(width) if width else 500
+        h = int(height) if height else 600
+        return (w, h)
+    except (TypeError, ValueError):
+        return (500, 600)
+
+
+def _save_window_size(width: int, height: int) -> None:
+    """Save window size."""
+    _save_setting("text_inserter_window_width", str(width))
+    _save_setting("text_inserter_window_height", str(height))
+
+
 class TextInserterDialog(GimpUi.Dialog):
     """Dialog for inserting text from CSV files using templates."""
 
@@ -204,10 +241,15 @@ class TextInserterDialog(GimpUi.Dialog):
         self.last_csv_path = _load_csv_path()
         self.output_dir = _load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
+        self._resize_save_timeout_id: int | None = None
 
-        # Set dialog properties
-        self.set_default_size(500, 600)
+        # Load and set window size
+        width, height = _load_window_size()
+        self.set_default_size(width, height)
         self.set_border_width(12)
+
+        # Connect to configure-event to save size changes
+        self.connect("configure-event", self._on_configure_event)
 
         # Add action buttons
         self.add_button("_Cancel", Gtk.ResponseType.CANCEL)
@@ -462,6 +504,9 @@ class TextInserterDialog(GimpUi.Dialog):
         fields_label.set_xalign(0.0)
         box.pack_start(fields_label, False, False, 0)
 
+        # Load saved filename field selections
+        saved_fields = _load_filename_fields()
+
         fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
             check = Gtk.CheckButton(label=field_label)
@@ -470,7 +515,8 @@ class TextInserterDialog(GimpUi.Dialog):
                 check.set_active(True)
                 check.set_sensitive(False)  # Disable date checkbox - always included
             else:
-                check.set_active(False)
+                # Set checkbox state based on saved settings
+                check.set_active(field_key in saved_fields)
             check.connect("toggled", self._on_filename_field_toggled)
             self.filename_field_checks[field_key] = check
             fields_box.pack_start(check, False, False, 0)
@@ -723,6 +769,9 @@ class TextInserterDialog(GimpUi.Dialog):
 
     def _on_filename_field_toggled(self, check: Gtk.CheckButton) -> None:
         """Handle filename field checkbox toggle."""
+        # Save the selected fields to settings
+        selected_fields = self._get_selected_filename_fields()
+        _save_filename_fields(selected_fields)
         self._update_filename_preview()
 
     def _get_selected_filename_fields(self) -> list[str]:
@@ -815,6 +864,42 @@ class TextInserterDialog(GimpUi.Dialog):
         except Exception as e:
             _debug_log(f"ERROR: Save failed: {e}")
             self._show_error(f"Failed to save image: {e}")
+
+    def _on_configure_event(self, widget: Gtk.Widget, event: object) -> bool:
+        """Save window size when it changes (with debouncing).
+
+        This method is called frequently during window resizing. To avoid
+        excessive file I/O, we use a debouncing mechanism that delays the
+        actual save operation until 500ms after the last resize event.
+
+        Args:
+            widget: The widget that received the event.
+            event: The configure event.
+
+        Returns:
+            False to allow the event to propagate.
+        """
+        # Cancel any pending save operation
+        if self._resize_save_timeout_id is not None:
+            GLib.source_remove(self._resize_save_timeout_id)
+
+        # Schedule a new save operation after 500ms of inactivity
+        self._resize_save_timeout_id = GLib.timeout_add(
+            500,  # milliseconds
+            self._save_window_size_delayed,
+        )
+        return False
+
+    def _save_window_size_delayed(self) -> bool:
+        """Callback to save window size after debounce delay.
+
+        Returns:
+            False to prevent the timeout from repeating.
+        """
+        width, height = self.get_size()
+        _save_window_size(width, height)
+        self._resize_save_timeout_id = None
+        return False  # Return False to stop the timeout from repeating
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.

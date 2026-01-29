@@ -7,11 +7,6 @@ this to a full GtkAssistant-based wizard.
 
 from __future__ import annotations
 
-import datetime
-import json
-import os
-from pathlib import Path
-
 import gi
 
 gi.require_version("Gimp", "3.0")
@@ -19,54 +14,6 @@ gi.require_version("GimpUi", "3.0")
 gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gimp, GimpUi, Gtk
-
-
-def _get_settings_path() -> Path:
-    if os.name == "nt":
-        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
-    else:
-        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "tachograph_wizard" / "settings.json"
-
-
-def _load_last_output_dir(default_dir: Path) -> Path:
-    settings_path = _get_settings_path()
-    try:
-        with settings_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        if not isinstance(data, dict):
-            return default_dir
-        value = data.get("wizard_last_output_dir")
-        if value:
-            candidate = Path(value)
-            if candidate.exists():
-                return candidate
-    except FileNotFoundError:
-        return default_dir
-    except (json.JSONDecodeError, TypeError, ValueError, AttributeError, OSError):
-        return default_dir
-    return default_dir
-
-
-def _save_last_output_dir(selected_dir: Path) -> None:
-    settings_path = _get_settings_path()
-    try:
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, str] = {}
-        if settings_path.exists():
-            try:
-                with settings_path.open("r", encoding="utf-8") as handle:
-                    loaded_data = json.load(handle)
-                # Validate that loaded data is a dict before using it
-                if isinstance(loaded_data, dict):
-                    data = loaded_data
-            except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
-                data = {}
-        data["wizard_last_output_dir"] = str(selected_dir)
-        with settings_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
-    except Exception:
-        return
 
 
 def run_wizard_dialog(
@@ -98,7 +45,6 @@ class TachographSimpleDialog(GimpUi.Dialog):
     Phase 1 (MVP) implementation. Provides basic controls for:
     - Splitting images using guides
     - Removing background
-    - Saving as PNG
 
     Phase 2 will replace this with a proper wizard interface.
     """
@@ -154,10 +100,6 @@ class TachographSimpleDialog(GimpUi.Dialog):
         # Step 2: Background removal
         background_frame = self._create_background_section()
         content_area.pack_start(background_frame, False, False, 0)
-
-        # Step 3: Save settings
-        save_frame = self._create_save_section()
-        content_area.pack_start(save_frame, False, False, 0)
 
         # Status label
         self.status_label = Gtk.Label()
@@ -303,35 +245,6 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
         return frame
 
-    def _create_save_section(self) -> Gtk.Frame:
-        """Create the save settings section."""
-        frame = Gtk.Frame(label="Step 3: Save As PNG")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        # Output directory
-        dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        dir_label = Gtk.Label(label="Output Directory:")
-        dir_box.pack_start(dir_label, False, False, 0)
-
-        self.output_dir_button = Gtk.FileChooserButton(
-            title="Select Output Directory",
-            action=Gtk.FileChooserAction.SELECT_FOLDER,
-        )
-        # Set default to last used output directory
-        default_dir = _load_last_output_dir(Path.home())
-        self.output_dir_button.set_current_folder(str(default_dir))
-        dir_box.pack_start(self.output_dir_button, True, True, 0)
-
-        box.pack_start(dir_box, False, False, 0)
-
-        save_button = Gtk.Button(label="Save All As PNG")
-        save_button.connect("clicked", self._on_save_clicked)
-        box.pack_start(save_button, False, False, 0)
-
-        return frame
-
     def _on_auto_split_clicked(self, button: Gtk.Button) -> None:
         """Handle auto split button click."""
         try:
@@ -405,41 +318,6 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
         except Exception as e:
             self._show_error(f"Background removal failed: {e}")
-
-    def _on_save_clicked(self, button: Gtk.Button) -> None:
-        """Handle save button click."""
-        if not self.split_images:
-            self._show_error("No images to save. Please split the image first.")
-            return
-
-        try:
-            from tachograph_wizard.core.exporter import Exporter
-
-            output_dir_path = self.output_dir_button.get_filename()
-            if not output_dir_path:
-                self._show_error("Please select an output directory")
-                return
-
-            output_dir = Path(output_dir_path)
-            _save_last_output_dir(output_dir)
-
-            for i, img in enumerate(self.split_images, start=1):
-                # Generate filename
-                filename = Exporter.generate_filename(
-                    date=datetime.date.today(),
-                    vehicle_number=str(i),
-                )
-                output_path = output_dir / filename
-
-                # Save
-                Exporter.save_png(img, output_path)
-
-            self.status_label.set_text(
-                f"Saved {len(self.split_images)} images to {output_dir}",
-            )
-
-        except Exception as e:
-            self._show_error(f"Save failed: {e}")
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.

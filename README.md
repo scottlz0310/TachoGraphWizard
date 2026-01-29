@@ -107,9 +107,8 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
    - 各円盤画像から背景（白い部分）が自動的に除去される
    - 背景除去後、縦横の中心ガイドが追加され、回転補正の目安になる
 
-5. **Step 3: Save As PNG（PNG保存）**
-   - **Output Directory**: 保存先フォルダを選択
-   - **Save All As PNG**ボタンをクリックして一括保存
+5. **次のステップ**
+   - 分割・背景除去された画像は、Tachograph Text Inserterで文字入れと保存を行います
 
 #### パディング設定のガイドライン
 
@@ -139,13 +138,25 @@ vehicle_type,vehicle_no,driver
 1. GIMP 3で画像を開く
 2. メニューから **Filters > Processing > Tachograph Text Inserter...** を選択
 
-#### 3. テキスト挿入
+#### 3. テキスト挿入と保存
 1. **テンプレートフォルダ選択（任意）**: 「Template Folder」でカスタムテンプレートの場所を選び、「Load Templates」をクリック
 2. **テンプレート選択**: ドロップダウンから使用するテンプレートを選択（デフォルト: standard）
 3. **CSV読み込み**: 「Load CSV」ボタンをクリックして、CSVファイルを選択
 4. **日付選択**: 前回選択値があればそれを初期値にし、無い場合は当日を設定
 5. **行選択**: スピナーで挿入するデータ行を選択（プレビューで確認可能）
 6. **テキスト挿入**: 「Insert Text」ボタンをクリックしてテキストレイヤーを作成
+7. **保存**:
+   - **Output Folder**: 保存先フォルダを選択
+   - **Select fields for filename**: ファイル名に含めるフィールドを選択（日付は必須、車両番号と運転手名は任意）
+   - **Save Image**ボタンをクリックして画像を保存
+
+#### 設定の永続化
+Text Inserterは以下の設定を自動的に保存し、次回起動時に復元します：
+- ファイル名に含めるフィールドの選択状態
+- ウィンドウサイズ
+- 最後に使用したCSVファイルのパス
+- 最後に使用した出力フォルダ
+- 前回選択した日付
 
 #### テンプレートのカスタマイズ
 テンプレートは `src/tachograph_wizard/templates/default_templates/` に配置されています。
