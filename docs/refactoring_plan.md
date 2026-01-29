@@ -478,7 +478,7 @@ def _debug_log(message: str) -> None:
 
 #### 品質指標
 
-- ✅ テスト: 85件すべてパス (filename_generator: 11件, settings関連: 20件含む)
+- ✅ テスト: 全85件パス (filename_generator: 11件, settings関連: 20件含む)
 - ✅ コードカバレッジ: filename_generator 100%, settings_manager 71%
 - ✅ コードフォーマット: ruff format チェック完了
 - ✅ Lint: ruff check クリーン
