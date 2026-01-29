@@ -134,3 +134,136 @@ Phase 1 完了により、次のフェーズに進む準備が整いました:
 ## まとめ
 
 Phase 1 のリファクタリングは成功裏に完了しました。すべてのテストがパスし、品質チェックも問題ありません。新規作成された `filename_generator.py` モジュールは、純粋関数として実装され、優れたテスト容易性を提供します。
+
+---
+
+# Phase 2 リファクタリング実装サマリー
+
+## 実装日
+2026-01-29
+
+## 目的
+`docs/refactoring_plan.md` の Phase 2 を実装:
+- `core/image_splitter.py` (925行) を分割
+- 画像分析と画像操作のロジックを独立したモジュールに分離
+- 保守性とテスト容易性を向上
+
+## 実装内容
+
+### 1. 画像分析モジュール（新規）
+**ファイル**: `src/tachograph_wizard/core/image_analysis.py` (264行)
+
+**機能**:
+- 連結成分の検出と表現
+- 画像のDPI取得
+- 大津の二値化閾値計算
+- 分析用スケーリング
+- GEGLバッファからのデータ取得
+
+**公開API**:
+```python
+@dataclass
+class Component:
+    """連結成分を表すデータクラス"""
+    min_x: int
+    min_y: int
+    max_x: int
+    max_y: int
+    area: int
+
+def get_analysis_scale(width: int, height: int) -> float
+def get_image_dpi(image: Gimp.Image) -> float | None
+def get_analysis_drawable(image: Gimp.Image) -> Gimp.Drawable
+def buffer_get_bytes(buffer, rect, scale, fmt) -> bytes
+def otsu_threshold(hist: list[int], total: int) -> int
+def find_components(mask: bytearray, width: int, height: int) -> list[Component]
+```
+
+### 2. 画像操作モジュール（新規）
+**ファイル**: `src/tachograph_wizard/core/image_operations.py` (265行)
+
+**機能**:
+- 画像の複製
+- 画像のクロップ
+- コンポーネントマスクの適用（ゴミ除去）
+
+**公開API**:
+```python
+def duplicate_image(image: Gimp.Image, debug_log: Callable | None = None) -> Gimp.Image
+def crop_image(image: Gimp.Image, x: int, y: int, width: int, height: int, ...) -> None
+def apply_component_mask(image: Gimp.Image, comp_mask: bytearray, ...) -> None
+```
+
+### 3. 画像分割モジュール（更新）
+**ファイル**: `src/tachograph_wizard/core/image_splitter.py` (925行 → 655行)
+
+**変更内容**:
+- `image_analysis` と `image_operations` をインポート
+- 内部メソッドを新モジュールのラッパーに変更
+- 完全な後方互換性を維持
+- 270行削減（29%減）
+
+### 4. テスト
+**ファイル**: `tests/unit/test_image_analysis.py`
+
+- 18個の包括的なテストケース
+- Component, get_analysis_scale, otsu_threshold, find_components をカバー
+
+## テスト結果
+```
+✅ 全テスト: 103個すべてパス（+18件）
+✅ コードカバレッジ: image_analysis.py 68%
+✅ ruff format: パス
+✅ ruff check: パス
+✅ basedpyright: 0エラー
+✅ CodeQL: 0アラート
+```
+
+## 変更統計
+
+| ファイル | 追加 | 削除 | 正味 |
+|---------|------|------|------|
+| `core/image_analysis.py` (新規) | +264 | - | +264 |
+| `core/image_operations.py` (新規) | +265 | - | +265 |
+| `core/image_splitter.py` | +78 | -348 | -270 |
+| `tests/unit/test_image_analysis.py` (新規) | +223 | - | +223 |
+| **合計** | **+830** | **-348** | **+482** |
+
+## アーキテクチャの改善
+
+### 変更前
+```
+ui/text_inserter_dialog.py
+  └─→ core/image_splitter.py (925行)
+        └─ [画像分析・操作ロジック内包]
+```
+
+### 変更後
+```
+core/image_splitter.py (655行)
+  ├─→ core/image_analysis.py (264行) ★新規★
+  │     └─ Component, スケーリング, Otsu, 連結成分
+  └─→ core/image_operations.py (265行) ★新規★
+        └─ 複製, クロップ, マスク適用
+```
+
+## 達成された品質指標
+
+### 定量的指標
+- ✅ image_splitter.py: 925行 → 655行（-29%）
+- ✅ 新規モジュール: 各300行以下（目標達成）
+- ✅ テスト数: 85件 → 103件（+21%）
+- ✅ 循環依存: 0（維持）
+- ✅ 後方互換性: 完全維持
+
+### 定性的指標
+- ✅ 単一責任原則: 各モジュールが明確な責務
+- ✅ 再利用性: image_analysis, image_operations は他でも使用可能
+- ✅ テスト容易性: 純粋な計算ロジックを分離
+- ✅ 型安全性: 完全な型ヒント
+
+## 次のステップ
+
+Phase 2 完了により、次のフェーズに進む準備が整いました:
+
+- **Phase 3**: `core/background_remover.py` (843行) の分割
