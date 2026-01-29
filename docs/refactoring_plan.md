@@ -1,30 +1,48 @@
 # モジュール肥大化リファクタリング計画
 
-## 現状分析
+## 1. 概要
 
-### モジュールサイズ一覧（行数降順）
+### 1.1 リファクタリングの目的
 
-| モジュール | 行数 | 状態 |
-|-----------|------|------|
-| `core/image_splitter.py` | 778 | ⚠️ 要リファクタリング |
-| `ui/text_inserter_dialog.py` | 753 | ⚠️ 要リファクタリング |
-| `core/background_remover.py` | 702 | ⚠️ 要リファクタリング |
-| `core/template_exporter.py` | 370 | 許容範囲 |
-| `tachograph_wizard.py` | 343 | 許容範囲 |
-| `procedures/wizard_procedure.py` | 272 | 許容範囲 |
-| `core/pdb_runner.py` | 264 | 許容範囲 |
-| その他 | <250 | OK |
+本計画は、TachoGraphWizardプロジェクトにおける肥大化したモジュールを適切なサイズに分割し、保守性とテスト容易性を向上させることを目的とする。
 
-**目標**: 
-- 各モジュールを300行以下に分割(必須ではなく目安)
-- 安定した公開API（呼び出し側の変更が最小）
-- テスト容易性（I/O境界の明確化、純粋関数化）
+### 1.2 目標指標
+
+#### 定量的目標
+- **行数**: 各モジュール300行以下を目安（厳密な制限ではない）
+- **依存性**: I/O境界を明確化し、モジュール間の依存を最小化
+- **循環依存**: ゼロを維持
+- **テストカバレッジ**: 重要ロジックの分岐カバレッジを向上
+
+#### 定性的目標
+- 安定した公開API（呼び出し側の変更を最小化）
+- テスト容易性（純粋関数化、I/O境界の明確化）
+- 単一責任原則の遵守
 
 ---
 
-## 1. text_inserter_dialog.py (753行)
+## 2. 現状分析
 
-### 現状の構造
+### 2.1 モジュールサイズ一覧（行数降順）
+
+| モジュール | 行数 | 状態 | 優先度 |
+|-----------|------|------|--------|
+| `core/image_splitter.py` | 778 | ⚠️ 要リファクタリング | 中 |
+| `ui/text_inserter_dialog.py` | 753 | ⚠️ 要リファクタリング | 高 |
+| `core/background_remover.py` | 702 | ⚠️ 要リファクタリング | 低 |
+| `core/template_exporter.py` | 370 | 許容範囲 | - |
+| `tachograph_wizard.py` | 343 | 許容範囲 | - |
+| `procedures/wizard_procedure.py` | 272 | 許容範囲 | - |
+| `core/pdb_runner.py` | 264 | 許容範囲 | - |
+| その他 | <250 | OK | - |
+
+---
+
+## 3. モジュール分割計画
+
+### 3.1 text_inserter_dialog.py (753行) - Phase 1
+
+#### 3.1.1 現状の構造
 
 ```
 CsvDateError (例外クラス)
@@ -44,19 +62,24 @@ TextInserterDialog (メインクラス、約600行)
   - ビジネスロジック (~150行)
 ```
 
-### 分割案
+#### 3.1.2 分割案
 
-| 新モジュール | 内容 | 推定行数 |
-|-------------|------|---------|
-| `ui/settings_manager.py` | 設定の読み書き関数すべて | ~150行 |
-| `ui/text_inserter_dialog.py` | ダイアログ本体（UIとイベント） | ~450行 |
-| `core/filename_generator.py` | ファイル名生成ロジック | ~50行 |
+| 新モジュール | 責務 | 推定行数 | 依存性 |
+|-------------|------|---------|--------|
+| `ui/settings_manager.py` | 設定の永続化（読み書き） | ~150行 | pathlib, json |
+| `core/filename_generator.py` | ファイル名生成ロジック | ~50行 | 純粋関数 |
+| `ui/text_inserter_dialog.py` | ダイアログUI・イベント制御 | ~450行 | settings_manager, filename_generator |
 
-### 詳細
+#### 3.1.3 移動対象の詳細
 
-#### settings_manager.py（新規作成）
+**settings_manager.py（新規作成）**
 ```python
-# 移動対象
+# 公開API
+- get_settings_path() -> Path
+- load_setting(key: str, default: Any) -> Any
+- save_setting(key: str, value: Any) -> None
+
+# 内部実装
 - _get_settings_path()
 - _load_setting() / _save_setting()
 - _load_path_setting()
@@ -69,17 +92,20 @@ TextInserterDialog (メインクラス、約600行)
 - _parse_date_string()
 ```
 
-#### filename_generator.py（新規作成）
+**filename_generator.py（新規作成）**
 ```python
+# 公開API
+- generate_filename(row: dict, fields: list[str], extension: str) -> str
+
 # 移動対象
 - _generate_filename_from_row() ロジック部分
 ```
 
 ---
 
-## 2. image_splitter.py (778行)
+### 3.2 image_splitter.py (778行) - Phase 2
 
-### 現状の構造
+#### 3.2.1 現状の構造
 
 ```
 _Component (データクラス、~20行)
@@ -101,41 +127,48 @@ ImageSplitter (静的メソッドのみのクラス)
     - get_split_result
 ```
 
-### 分割案
+#### 3.2.2 分割案
 
-| 新モジュール | 内容 | 推定行数 |
-|-------------|------|---------|
-| `core/image_analysis.py` | 画像分析（Otsu、コンポーネント検出） | ~200行 |
-| `core/image_operations.py` | 画像操作（複製、クロップ、マスク適用） | ~200行 |
-| `core/image_splitter.py` | 分割ロジック本体 | ~300行 |
+| 新モジュール | 責務 | 推定行数 | 依存性 |
+|-------------|------|---------|--------|
+| `core/image_analysis.py` | 画像分析（Otsu、コンポーネント検出） | ~200行 | GIMP API |
+| `core/image_operations.py` | 画像操作（複製、クロップ、マスク） | ~200行 | GIMP API |
+| `core/image_splitter.py` | 分割ロジック調整（公開API） | ~300行 | image_analysis, image_operations |
 
-### 詳細
+#### 3.2.3 移動対象の詳細
 
-#### image_analysis.py（新規作成）
+**image_analysis.py（新規作成）**
 ```python
-# 移動対象
-- _Component クラス
+# データクラス
+- Component (旧_Component)
+
+# 公開API
+- get_image_dpi(image) -> float
+- otsu_threshold(drawable) -> int
+- find_components(drawable, threshold: int) -> list[Component]
+
+# 内部実装
 - _analysis_scale()
-- _get_image_dpi()
 - _get_analysis_drawable()
 - _buffer_get_bytes()
-- _otsu_threshold()
-- _find_components()
 ```
 
-#### image_operations.py（新規作成）
+**image_operations.py（新規作成）**
 ```python
-# 移動対象
-- _duplicate_image()
-- _crop_image()
-- _apply_component_mask()
+# 公開API
+- duplicate_image(image) -> Image
+- crop_image(image, x: int, y: int, width: int, height: int) -> Image
+- apply_component_mask(drawable, component: Component) -> None
+
+# 内部実装
+- (必要に応じて内部関数を定義)
 ```
 
 ---
 
-## 3. background_remover.py (702行)
+### 3.3 background_remover.py (702行) - Phase 3
 
-### 現状の構造
+#### 3.3.1 現状の構造
 
 ```
 BackgroundRemover (静的メソッドのみのクラス)
@@ -147,27 +180,36 @@ BackgroundRemover (静的メソッドのみのクラス)
   - process_background (~30行)
 ```
 
-### 分割案
+#### 3.3.2 分割案
 
-| 新モジュール | 内容 | 推定行数 |
-|-------------|------|---------|
-| `core/island_detector.py` | 島検出・最大島抽出ロジック | ~300行 |
-| `core/background_remover.py` | 背景除去の高レベルAPI | ~250行 |
-| `core/image_cleanup.py` | クリーンアップ・ガイド追加 | ~150行 |
+| 新モジュール | 責務 | 推定行数 | 依存�� |
+|-------------|------|---------|--------|
+| `core/island_detector.py` | 連結成分検出・最大島抽出 | ~300行 | numpy/GIMP |
+| `core/image_cleanup.py` | ノイズ除去・クリーンアップ | ~150行 | GIMP API |
+| `core/background_remover.py` | 背景除去の統合API | ~250行 | island_detector, image_cleanup |
 
-### 詳細
+#### 3.3.3 移動対象の詳細
 
-#### island_detector.py（新規作成）
+**island_detector.py（新規作成）**
 ```python
-# 移動対象
-- remove_garbage_keep_largest_island() の内部ロジック
+# 公開API
+- find_largest_island(drawable, threshold: int) -> Island
+- remove_small_islands(drawable, min_size: int) -> None
+
+# 移動対象（内部ロジック）
+- remove_garbage_keep_largest_island() の分割
   - 連結成分ラベリング
   - 最大島の検出
   - マスク生成
 ```
 
-#### image_cleanup.py（新規作成）
+**image_cleanup.py（新規作成）**
 ```python
+# 公開API
+- despeckle(drawable, radius: int) -> None
+- auto_cleanup_and_crop(image) -> tuple[int, int, int, int]
+- add_center_guides(image) -> None
+
 # 移動対象
 - despeckle()
 - auto_cleanup_and_crop()
@@ -176,48 +218,226 @@ BackgroundRemover (静的メソッドのみのクラス)
 
 ---
 
-## 実装優先順位
+## 4. 実装計画
 
-### Phase 1: 設定管理の分離（低リスク）
-1. `ui/settings_manager.py` を作成
-2. text_inserter_dialog.py から設定関数を移動
-3. テスト実行・動作確認
+### 4.1 フェーズ構成
 
-### Phase 2: 画像分析の分離（中リスク）
-1. `core/image_analysis.py` を作成
-2. image_splitter.py から分析関数を移動
-3. テスト実行・動作確認
+各フェーズは以下の手順で進める：
 
-### Phase 3: 背景除去の分離（高リスク）
-1. `core/island_detector.py` を作成
-2. 巨大な `remove_garbage_keep_largest_island` を分割
-3. テスト実行・動作確認
+1. **事前準備**: Characterization testの作成（現状の動作を固定）
+2. **公開APIの設計**: 新モジュールのインターフェース定義
+3. **モジュール作成**: 新ファイルの作成とコードの移動
+4. **テスト実行**: 自動テスト + 手動テスト
+5. **コードレビュー**: 品質確認とフィードバック
+
+### 4.2 Phase 1: 設定管理の分離（低リスク）
+
+**目的**: UI層からビジネスロジックを分離
+
+**期間**: 1-2日
+
+**手順**:
+1. `ui/settings_manager.py` と `core/filename_generator.py` を作成
+2. 公開APIを定義（型ヒント含む）
+3. text_inserter_dialog.py から関数を移動
+4. インポートパスを更新
+5. テスト実行
+   - `uv run pre-commit run --all-files`
+   - `uv run pytest`
+   - GIMP環境での手動テスト（設定保存・読み込み）
+
+**リスク**: 低（I/O操作のみ、外部依存少ない）
+
+### 4.3 Phase 2: 画像分析の分離（中リスク）
+
+**目的**: 画像処理ロジックの責務分離
+
+**期間**: 2-3日
+
+**手順**:
+1. `core/image_analysis.py` と `core/image_operations.py` を作成
+2. 公開APIを定義
+3. Characterization testを追加（画像メトリクスのゴールデンマスター）
+4. image_splitter.py から関数を移動
+5. 内部呼び出しを新モジュール経由に変更
+6. テスト実行
+   - 自動テスト（メトリクス比較）
+   - GIMP環境での手動テスト（分割結果の目視確認）
+
+**リスク**: 中（GIMP API依存、画像処理の正確性検証が必要）
+
+### 4.4 Phase 3: 背景除去の分離（高リスク）
+
+**目的**: 巨大関数の分割と責務の明確化
+
+**期間**: 3-5日
+
+**手順**:
+1. `core/island_detector.py` と `core/image_cleanup.py` を作成
+2. 公開APIを定義
+3. Characterization testを追加（ピクセル単位の比較または近似メトリクス）
+4. 巨大な `remove_garbage_keep_largest_island` を段階的に分割
+   - まず内部で小関数に分割
+   - 次に新モジュールに移動
+5. テスト実行
+   - 画像差分テスト（PSNR/SSIM許容範囲）
+   - GIMP環境での手動テスト（背景除去結果の確認）
+
+**リスク**: 高（470行の巨大関数、アルゴリズムの複雑性）
 
 ---
 
-## 注意事項
+## 5. テスト戦略
 
-- 各フェーズ完了後に `uv run pre-commit run --all-files` と `uv run pytest` を実行
-- GIMP環境での手動テストも必要（特にPhase 2, 3）
-- インポートパスの変更に注意（他モジュールからの参照を確認）
-- `_debug_log` 関数は各モジュールでローカルに定義するか、共通ユーティリティに移動
-- 純粋関数 + 小さなデータ構造に寄せるのを目指す（特に内部)
-- test戦略
-  - characterization test（現状の出力を固定するテスト）
-  - 画像系なら golden master（期待画像 or 期待メトリクス）
-  - ピクセル完全一致が難しければ、差分許容（PSNR/SSIM的な近似や、二値化後の一致率など）でも良い
-- **各新モジュールの公開API（関数シグネチャ）**を先に決める
-- フェーズごとに characterization test を追加してから移動
-- 目標指標を「行数」だけでなく
-  - 依存（I/Oの境界数）
-  - 循環依存ゼロ
-  - 重要ロジックの分岐カバレッジ
+### 5.1 Characterization Test
+
+**目的**: リファクタリング前後で動作が変わらないことを保証
+
+**手法**:
+- 現状の出力を「正解」として記録
+- リファクタリング後に同じ入力で同じ出力が得られることを確認
+
+### 5.2 画像処理のテスト
+
+#### ゴールデンマスター方式
+- 期待される画像を保存
+- テスト時に生成画像と比較
+
+#### メトリクス方式（推奨）
+- ピクセル完全一致が困難な場合
+- PSNR（Peak Signal-to-Noise Ratio）
+- SSIM（Structural Similarity Index）
+- 二値化後の一致率
+
+#### テスト対象
+| テスト項目 | 手法 | 許容範囲 |
+|-----------|------|---------|
+| 画像分割位置 | ピクセル座標比較 | ±2px |
+| 背景除去結果 | PSNR/SSIM | PSNR>30dB |
+| ノイズ除去 | 二値化後の一致率 | >98% |
+
+### 5.3 テスト実行タイミング
+
+- **各コミット前**: `uv run pre-commit run --all-files`
+- **各フェーズ完了後**: `uv run pytest` + GIMP手動テスト
+- **最終確認**: 全フェーズ完了後の統合テスト
 
 ---
 
-## 期待される効果
+## 6. 実装上の注意事項
 
-- 各モジュールが単一責任に近づく
-- テストの書きやすさ向上
-- コードの見通しが改善
-- 将来の機能追加が容易に
+### 6.1 共通ガイドライン
+
+- **公開APIの設計優先**: コードを移動する前にインターフェースを確定
+- **型ヒントの徹底**: すべての公開関数に型アノテーションを付与
+- **純粋関数化**: 可能な限り副作用を排除し、テスト容易性を向上
+- **小さなコミット**: 機能単位で細かくコミットし、問題発生時のロールバックを容易に
+
+### 6.2 モジュール間依存の管理
+
+- **循環依存の禁止**: 依存グラフは常にDAG（有向非巡回グラフ）を維持
+- **依存方向の原則**: 
+  - `ui` → `core`（UI層がコア層を使用）
+  - `core` ↛ `ui`（コア層はUIを知らない）
+
+### 6.3 `_debug_log` 関数の扱い
+
+以下のいずれかの方針を選択：
+
+**A. 共通ユーティリティ化**
+```python
+# core/logging_util.py を作成
+def debug_log(message: str) -> None:
+    """統一されたデバッグログ出力"""
+    ...
+```
+
+**B. 各モジュールでローカル定義**
+```python
+# 各モジュール内で独自実装
+def _debug_log(message: str) -> None:
+    """モジュール固有のログ出力"""
+    ...
+```
+
+**推奨**: オプションAで統一的なログ管理を実現
+
+### 6.4 インポートパスの変更管理
+
+- **影響範囲の確認**: 移動する関数/クラスの参照箇所をすべてリストアップ
+- **段階的移行**: 
+  1. 新モジュールに実装を追加
+  2. 旧モジュールで新モジュールをインポートし、互換性維持
+  3. 呼び出し側を徐々に更新
+  4. 旧モジュールの互換レイヤーを削除
+
+---
+
+## 7. 成功基準と期待される効果
+
+### 7.1 定量的成功基準
+
+- [ ] すべてのターゲットモジュールが300行以下
+- [ ] テストカバレッジ: 新規コア関数の80%以上
+- [ ] 循環依存: ゼロ
+- [ ] 既存機能の動作: すべてのテストがパス
+
+### 7.2 定性的成功基準
+
+- [ ] 各モジュールが明確な単一責任を持つ
+- [ ] 新規開発者がコードを理解しやすい
+- [ ] 機能追加時の変更範囲が明確
+
+### 7.3 期待される効果
+
+#### 短期的効果
+- コードレビューの効率化（変更範囲が小さく明確）
+- バグ修正の迅速化（影響範囲の特定が容易）
+
+#### 長期的効果
+- 新機能開発の加速（既存コードの理解が容易）
+- テストコードの充実（テスタブルな設計）
+- 技術的負債の削減（保守コストの低減��
+
+---
+
+## 8. リスク管理
+
+### 8.1 想定リスクと対策
+
+| リスク | 発生確率 | 影響度 | 対策 |
+|--------|---------|--------|------|
+| リファクタリングによるバグ混入 | 中 | 高 | Characterization testの充実 |
+| GIMP API依存による互換性問題 | 低 | 高 | 各フェーズで手動テスト実施 |
+| 工数超過 | 中 | 中 | フェーズごとに進捗確認、必要に応じて範囲調整 |
+| パフォーマンス劣化 | 低 | 中 | ベンチマークテストの実施 |
+
+### 8.2 ロールバック計画
+
+- 各フェーズは独立したブランチで実施
+- 問題発生時は該当フェーズのブランチを破棄し、前フェーズに戻る
+- mainブランチへのマージは全テストパス後のみ
+
+---
+
+## 9. 今後の展開
+
+### 9.1 追加検討事項
+
+- `core/template_exporter.py` (370行) の分割必要性を評価
+- 共通データクラスの整理（複数モジュールで使用される型定義）
+- ドキュメント整備（APIドキュメント、アーキテクチャ図）
+
+### 9.2 継続的改善
+
+- 定期的なモジュールサイズレビュー（月次）
+- 新規コードへのサイズ制限ガイドラインの適用
+- リファクタリング知見の共有（チーム内ドキュメント化）
+
+---
+
+## 10. 参考資料
+
+- [Python コーディング規約（PEP 8）](https://peps.python.org/pep-0008/)
+- [Clean Code by Robert C. Martin](https://www.oreilly.com/library/view/clean-code-a/9780136083238/)
+- [Working Effectively with Legacy Code by Michael Feathers](https://www.oreilly.com/library/view/working-effectively-with/0131177052/)
