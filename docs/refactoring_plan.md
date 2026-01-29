@@ -458,22 +458,22 @@ def _debug_log(message: str) -> None:
 
 | 日付 | 内容 | 関連PR/Issue |
 |------|------|-------------|
-| 2026-01-29 | Phase 1 完了: settings_manager.py (242行), filename_generator.py (54行) の作成 | PR #38 |
-| 2026-01-29 | Phase 1 検証: 全テスト (85件) パス、コード品質チェック完了 | 本PR |
+| 2026-01-29 | Phase 1 完了: settings_manager.py (約240行), filename_generator.py (約55行) の作成 | PR #38 |
+| 2026-01-29 | Phase 1 検証: 全テスト (85件) パス、コード品質チェック完了 | PR #XX |
 
 ### 11.3 Phase 1 完了サマリー
 
 #### 作成されたモジュール
 
-**ui/settings_manager.py (242行)**
+**src/tachograph_wizard/ui/settings_manager.py (約240行)**
 - 設定ファイルの読み書き機能を提供
 - JSON形式での永続化
 - 型ヒント完備
 - 公開API: `load_*()`, `save_*()`, `parse_date_string()`
 
-**core/filename_generator.py (54行)**
-- ファイル名生成ロジックの純粋関数化
-- テスト容易性の向上
+**src/tachograph_wizard/core/filename_generator.py (約55行)**
+- ファイル名生成ロジックの分離と副作用の最小化
+  - 日付未指定時は実行時の `datetime.date.today()` を使用するため純粋関数ではないが、日付を引数で指定可能とすることでテスト容易性を高めた
 - 公開API: `generate_filename()`
 
 #### 品質指標
