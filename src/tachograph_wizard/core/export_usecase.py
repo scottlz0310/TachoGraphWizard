@@ -25,7 +25,7 @@ class ExportTemplateUseCase:
             template_name: テンプレート名
 
         Returns:
-            正規化されたテンプレート名（.json拡張子を除去）
+            正規化されたテンプレート名(.json拡張子を除去)
         """
         normalized = template_name.strip()
         if normalized.lower().endswith(".json"):
@@ -45,7 +45,7 @@ class ExportTemplateUseCase:
             image: GIMP画像
             template_name: テンプレート名
             output_dir: 出力ディレクトリ
-            description: テンプレートの説明（オプション）
+            description: テンプレートの説明(オプション)
 
         Returns:
             エクスポートされたファイルのパス

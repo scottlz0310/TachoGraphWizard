@@ -47,7 +47,7 @@ class TextInsertUseCase:
 
         Args:
             row_data: CSV行データ
-            strict: 厳密モード（エラー時に例外を投げる）
+            strict: 厳密モード(エラー時に例外を投げる)
 
         Returns:
             (解決された日付 or None, ソース)
@@ -90,8 +90,8 @@ class TextInsertUseCase:
 
         Args:
             row_data: CSV行データ
-            selected_date: UIで選択された日付（フォールバック用）
-            strict: 厳密モード（エラー時に例外を投げる）
+            selected_date: UIで選択された日付(フォールバック用)
+            strict: 厳密モード(エラー時に例外を投げる)
 
         Returns:
             date_year, date_month, date_day, date フィールドが埋められた行データ
@@ -145,7 +145,7 @@ class TextInsertUseCase:
             csv_path: CSVファイルパス
 
         Returns:
-            パースされたCSVデータ（行のリスト）
+            パースされたCSVデータ(行のリスト)
 
         Raises:
             FileNotFoundError: ファイルが見つからない場合
@@ -192,7 +192,7 @@ class TextInsertUseCase:
         selected_date: datetime.date,
         selected_fields: list[str],
     ) -> Path:
-        """画像をメタデータ（ファイル名）付きで保存する.
+        """画像をメタデータ(ファイル名)付きで保存する.
 
         Args:
             image: GIMP画像
@@ -216,7 +216,7 @@ class TextInsertUseCase:
         filename = TextInsertUseCase.generate_filename_from_row(enriched_row, selected_date, selected_fields)
         output_path = output_folder / filename
 
-        # 複製して保存（元の画像を変更しない）
+        # Duplicate image before saving to avoid modifying the original
         export_image = image.duplicate()
         try:
             Exporter.save_png(export_image, output_path, flatten=False)
