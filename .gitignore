@@ -269,3 +269,4 @@ logs/
 .vscode/launch.json
 .vscode/settings.json
 .vscode/tasks.json
+bandit-report.json
