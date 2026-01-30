@@ -60,6 +60,7 @@ class TextInsertUseCase:
         month = row_data.get("date_month", "").strip()
         day = row_data.get("date_day", "").strip()
         if year or month or day:
+            # All three components must be present; partial components are ignored
             if year and month and day:
                 try:
                     return datetime.date(int(year), int(month), int(day)), "csv_parts"
