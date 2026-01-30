@@ -350,9 +350,9 @@ class TextInserterDialog(GimpUi.Dialog):
             action=Gtk.FileChooserAction.SELECT_FOLDER,
         )
         if self.output_dir.exists():
-            self.output_folder_button.set_current_folder(str(self.output_dir))
+            self.output_folder_button.set_filename(str(self.output_dir))
         else:
-            self.output_folder_button.set_current_folder(str(Path.home()))
+            self.output_folder_button.set_filename(str(Path.home()))
         folder_box.pack_start(self.output_folder_button, True, True, 0)
         box.pack_start(folder_box, False, False, 0)
 
