@@ -127,11 +127,16 @@ class TextInserterDialog(GimpUi.Dialog):
             "template_combo": self.template_combo,
             "csv_chooser": self.csv_chooser,
             "date_calendar": self.date_calendar,
+            "row_adjustment": self.row_adjustment,
             "row_spinner": self.row_spinner,
+            "row_count_label": self.row_count_label,
             "preview_text": self.preview_text,
             "output_folder_button": self.output_folder_button,
             "filename_preview_label": self.filename_preview_label,
             "status_label": self.status_label,
+            "field_date": self.filename_field_checks.get("date"),
+            "field_vehicle_no": self.filename_field_checks.get("vehicle_no"),
+            "field_driver": self.filename_field_checks.get("driver"),
         }
         for widget_name, widget in required_widgets.items():
             if widget is None:

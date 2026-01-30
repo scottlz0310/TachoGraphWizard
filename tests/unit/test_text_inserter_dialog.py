@@ -613,15 +613,21 @@ class TestTextInserterDialogCancel:
 class TestTextInserterUILoad:
     """Test text inserter dialog UI loading from .ui file."""
 
+    @staticmethod
+    def _get_ui_file_path() -> Path:
+        """Get the path to the text_inserter_dialog.ui file."""
+        from pathlib import Path
+
+        return Path(__file__).parent.parent.parent / "src" / "tachograph_wizard" / "ui" / "text_inserter_dialog.ui"
+
     def test_ui_file_exists(
         self,
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """UI file exists and is readable."""
-        from pathlib import Path
-
+        _ = mock_gimp_modules  # Required for GIMP module mocking
         # Check that .ui file exists
-        ui_file = Path(__file__).parent.parent.parent / "src" / "tachograph_wizard" / "ui" / "text_inserter_dialog.ui"
+        ui_file = self._get_ui_file_path()
         assert ui_file.exists(), f"UI file not found: {ui_file}"
 
         # Verify it's readable and contains XML
@@ -634,8 +640,7 @@ class TestTextInserterUILoad:
         mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """All required widget IDs are present in the .ui file."""
-        from pathlib import Path
-
+        _ = mock_gimp_modules  # Required for GIMP module mocking
         # Required widget IDs as specified in the issue
         required_widget_ids = [
             "template_dir_button",
@@ -650,7 +655,7 @@ class TestTextInserterUILoad:
         ]
 
         # Load the .ui file and check for widget IDs
-        ui_file = Path(__file__).parent.parent.parent / "src" / "tachograph_wizard" / "ui" / "text_inserter_dialog.ui"
+        ui_file = self._get_ui_file_path()
         assert ui_file.exists(), f"UI file not found: {ui_file}"
 
         ui_content = ui_file.read_text(encoding="utf-8")

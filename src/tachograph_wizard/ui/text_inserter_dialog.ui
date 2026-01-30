@@ -76,7 +76,7 @@ Insert text from CSV files using templates.</property>
                         <child>
                           <object class="GtkFileChooserButton" id="template_dir_button">
                             <property name="visible">True</property>
-                            <property name="can-focus">False</property>
+                            <property name="can-focus">True</property>
                             <property name="action">select-folder</property>
                             <property name="title" translatable="yes">Select Template Folder</property>
                           </object>
@@ -153,7 +153,7 @@ Insert text from CSV files using templates.</property>
                         <child>
                           <object class="GtkComboBoxText" id="template_combo">
                             <property name="visible">True</property>
-                            <property name="can-focus">False</property>
+                            <property name="can-focus">True</property>
                           </object>
                           <packing>
                             <property name="expand">True</property>
@@ -216,7 +216,7 @@ Insert text from CSV files using templates.</property>
                         <child>
                           <object class="GtkFileChooserButton" id="csv_chooser">
                             <property name="visible">True</property>
-                            <property name="can-focus">False</property>
+                            <property name="can-focus">True</property>
                             <property name="title" translatable="yes">Select CSV File</property>
                           </object>
                           <packing>
@@ -477,7 +477,7 @@ Insert text from CSV files using templates.</property>
                         <child>
                           <object class="GtkFileChooserButton" id="output_folder_button">
                             <property name="visible">True</property>
-                            <property name="can-focus">False</property>
+                            <property name="can-focus">True</property>
                             <property name="action">select-folder</property>
                             <property name="title" translatable="yes">Select Output Folder</property>
                           </object>
