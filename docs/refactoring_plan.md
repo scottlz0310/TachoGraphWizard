@@ -452,7 +452,7 @@ def _debug_log(message: str) -> None:
 |---------|------|--------|--------|--------|------|
 | Phase 1: 設定管理の分離 | ✅ 完了 | 2026-01-29 | 2026-01-29 | - | settings_manager.py, filename_generator.py 作成完了 |
 | Phase 2: 画像分析の分離 | ✅ 完了 | 2026-01-29 | 2026-01-29 | - | image_analysis.py, image_operations.py 作成完了 |
-| Phase 3: 背景除去の分離 | ⏳ 進行中 | 2026-01-30 | - | - | image_cleanup.py / island_detector.py 作成 |
+| Phase 3: 背景除去の分離 | ✅ 完了 | 2026-01-30 | 2026-01-30 | - | image_cleanup.py (212行), island_detector.py (489行) 作成完了 |
 
 ### 11.2 実施履歴
 
@@ -463,6 +463,7 @@ def _debug_log(message: str) -> None:
 | 2026-01-29 | Phase 2 完了: image_analysis.py (264行), image_operations.py (265行) の作成 | PR #40 |
 | 2026-01-29 | Phase 2 検証: 全テスト (103件) パス、コード品質チェック完了 | PR #40 |
 | 2026-01-30 | Phase 3 着手: image_cleanup.py / island_detector.py へ背景除去ロジックを分割 | - |
+| 2026-01-30 | Phase 3 完了: background_remover.py (702行→232行), 全テスト (149件) パス | - |
 
 ### 11.3 Phase 1 完了サマリー
 
@@ -496,6 +497,10 @@ def _debug_log(message: str) -> None:
 
 ### 11.4 次回アクション
 
-- [ ] Phase 1 の最終レビュー完了
-- [ ] Phase 2 の着手判断と計画策定
-- [ ] text_inserter_dialog.py のさらなる分割検討
+**全フェーズ完了 (Phase 1-3)**
+
+今後の改善検討事項:
+- [ ] `island_detector.py` (489行) の更なる分割（オプション）
+- [ ] `text_inserter_dialog.py` のUI分離検討（将来的な改善）
+- [ ] テストカバレッジの向上
+- [ ] GIMP 環境での統合テスト実施
