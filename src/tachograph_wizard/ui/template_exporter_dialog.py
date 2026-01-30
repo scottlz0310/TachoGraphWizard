@@ -14,7 +14,8 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gimp, GimpUi, Gtk
 
-from tachograph_wizard.core.template_exporter import TemplateExporter, TemplateExportError
+from tachograph_wizard.core.export_usecase import ExportTemplateUseCase
+from tachograph_wizard.core.template_exporter import TemplateExportError
 from tachograph_wizard.core.template_manager import TemplateManager
 
 
@@ -42,7 +43,6 @@ class TemplateExporterDialog(GimpUi.Dialog):
         )
 
         self.image = image
-        self.exporter = TemplateExporter(image)
         self.template_manager = TemplateManager()
 
         self.set_default_size(520, 420)
@@ -159,7 +159,10 @@ class TemplateExporterDialog(GimpUi.Dialog):
         return frame
 
     def _update_preview(self) -> None:
-        names = self.exporter.list_field_names()
+        from tachograph_wizard.core.template_exporter import TemplateExporter
+
+        exporter = TemplateExporter(self.image)
+        names = exporter.list_field_names()
         if not names:
             self.preview_text.get_buffer().set_text("No text layers detected.")
             return
@@ -172,15 +175,13 @@ class TemplateExporterDialog(GimpUi.Dialog):
         if not template_name:
             self._show_error("Please enter a template name")
             return
-        if template_name.lower().endswith(".json"):
-            template_name = template_name[:-5]
 
         output_dir = self.output_dir_button.get_filename()
         if not output_dir:
             self._show_error("Please select an output directory")
             return
 
-        output_path = Path(output_dir) / f"{template_name}.json"
+        output_path = Path(output_dir) / f"{ExportTemplateUseCase.sanitize_template_name(template_name)}.json"
 
         if output_path.exists():
             if not self._confirm_overwrite(output_path):
@@ -188,9 +189,10 @@ class TemplateExporterDialog(GimpUi.Dialog):
 
         try:
             description = self.description_entry.get_text().strip()
-            self.exporter.export_template(
+            output_path = ExportTemplateUseCase.export_template(
+                self.image,
                 template_name,
-                output_path,
+                Path(output_dir),
                 description=description,
             )
             self.status_label.set_text(f"Exported template to {output_path}")

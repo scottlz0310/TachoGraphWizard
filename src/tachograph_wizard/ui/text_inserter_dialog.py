@@ -16,11 +16,8 @@ gi.require_version("GLib", "2.0")
 
 from gi.repository import Gimp, GimpUi, GLib, Gtk
 
-from tachograph_wizard.core.csv_parser import CSVParser
-from tachograph_wizard.core.exporter import Exporter
-from tachograph_wizard.core.filename_generator import generate_filename
 from tachograph_wizard.core.template_manager import TemplateManager
-from tachograph_wizard.core.text_renderer import TextRenderer
+from tachograph_wizard.core.text_insert_usecase import CsvDateError, TextInsertUseCase
 from tachograph_wizard.ui.settings_manager import (
     load_csv_path,
     load_filename_fields,
@@ -28,11 +25,8 @@ from tachograph_wizard.ui.settings_manager import (
     load_output_dir,
     load_template_dir,
     load_window_size,
-    parse_date_string,
-    save_csv_path,
     save_filename_fields,
     save_last_used_date,
-    save_output_dir,
     save_template_dir,
     save_window_size,
 )
@@ -50,20 +44,6 @@ def _debug_log(message: str) -> None:
             log_file.write(f"[{ts}] text_inserter_dialog: {message}\n")
     except Exception:
         return
-
-
-class CsvDateError(ValueError):
-    """Raised when CSV date values are invalid."""
-
-    @classmethod
-    def from_components(cls, year: str, month: str, day: str) -> CsvDateError:
-        message = f"Invalid date components in CSV: {year}-{month}-{day}"
-        return cls(message)
-
-    @classmethod
-    def from_string(cls, value: str) -> CsvDateError:
-        message = f"Invalid date format in CSV: {value}"
-        return cls(message)
 
 
 class TextInserterDialog(GimpUi.Dialog):
@@ -487,10 +467,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
         try:
             csv_path = Path(csv_path_str)
-            self.csv_data = CSVParser.parse(csv_path)
-
-            # Save the CSV path for future use
-            save_csv_path(csv_path)
+            self.csv_data = TextInsertUseCase.load_csv(csv_path)
             self.last_csv_path = csv_path
 
             # Update row spinner
@@ -524,7 +501,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
         row = self.csv_data[self.current_row_index]
         try:
-            row = self._build_row_data(row, strict=True)
+            row = TextInsertUseCase.build_row_data(row, self._get_selected_date(), strict=True)
         except CsvDateError as exc:
             self.preview_text.get_buffer().set_text(f"Invalid date in CSV: {exc}")
             return
@@ -534,52 +511,6 @@ class TextInserterDialog(GimpUi.Dialog):
 
         preview_text = "\n".join(preview_lines)
         self.preview_text.get_buffer().set_text(preview_text)
-
-    def _resolve_date_from_row(
-        self,
-        row_data: dict[str, str],
-        *,
-        strict: bool,
-    ) -> tuple[datetime.date | None, str]:
-        year = row_data.get("date_year", "").strip()
-        month = row_data.get("date_month", "").strip()
-        day = row_data.get("date_day", "").strip()
-        if year or month or day:
-            if year and month and day:
-                try:
-                    return datetime.date(int(year), int(month), int(day)), "csv_parts"
-                except ValueError as exc:
-                    if strict:
-                        raise CsvDateError.from_components(year, month, day) from exc
-                    return None, "invalid"
-
-        date_value = row_data.get("date", "").strip()
-        if date_value:
-            parsed = parse_date_string(date_value)
-            if parsed is None:
-                if strict:
-                    raise CsvDateError.from_string(date_value)
-                return None, "invalid"
-            return parsed, "csv_date"
-
-        return None, "none"
-
-    def _build_row_data(self, row_data: dict[str, str], *, strict: bool) -> dict[str, str]:
-        result = dict(row_data)
-        selected_date, source = self._resolve_date_from_row(row_data, strict=strict)
-        if selected_date is None:
-            selected_date = self._get_selected_date()
-            source = "ui"
-
-        if source != "csv_parts":
-            result["date_year"] = str(selected_date.year)
-            result["date_month"] = str(selected_date.month)
-            result["date_day"] = str(selected_date.day)
-
-        if not result.get("date", "").strip():
-            result["date"] = selected_date.isoformat()
-
-        return result
 
     def _on_insert_clicked(self, button: Gtk.Button) -> None:
         """Handle insert button click."""
@@ -603,17 +534,14 @@ class TextInserterDialog(GimpUi.Dialog):
             if template_path is None:
                 self._show_error("Selected template not found")
                 return
-            template = self.template_manager.load_template(template_path)
 
-            # Create text renderer
-            renderer = TextRenderer(self.image, template)
-
-            # Render text from current row
-            row_data = self._build_row_data(
+            # Insert text using UseCase
+            layers = TextInsertUseCase.insert_text_from_csv(
+                self.image,
+                template_path,
                 self.csv_data[self.current_row_index],
-                strict=True,
+                self._get_selected_date(),
             )
-            layers = renderer.render_from_csv_row(row_data)
 
             # Track that changes were made
             if layers:
@@ -640,24 +568,6 @@ class TextInserterDialog(GimpUi.Dialog):
         """Get the list of selected filename fields."""
         return [key for key, check in self.filename_field_checks.items() if check.get_active()]
 
-    def _generate_filename_from_row(self, row_data: dict[str, str]) -> str:
-        """Generate filename based on selected fields and current row data.
-
-        Args:
-            row_data: The CSV row data dictionary.
-
-        Returns:
-            Generated filename string.
-        """
-        selected_fields = self._get_selected_filename_fields()
-        selected_date = self._get_selected_date()
-
-        return generate_filename(
-            date=selected_date,
-            vehicle_number=row_data.get("vehicle_no", "") if "vehicle_no" in selected_fields else "",
-            driver_name=row_data.get("driver", "") if "driver" in selected_fields else "",
-        )
-
     def _update_filename_preview(self) -> None:
         """Update the filename preview label."""
         if not hasattr(self, "filename_preview_label"):
@@ -668,11 +578,17 @@ class TextInserterDialog(GimpUi.Dialog):
             return
 
         try:
-            row_data = self._build_row_data(
+            row_data = TextInsertUseCase.build_row_data(
                 self.csv_data[self.current_row_index],
+                self._get_selected_date(),
                 strict=False,
             )
-            filename = self._generate_filename_from_row(row_data)
+            selected_fields = self._get_selected_filename_fields()
+            filename = TextInsertUseCase.generate_filename_from_row(
+                row_data,
+                self._get_selected_date(),
+                selected_fields,
+            )
             self.filename_preview_label.set_text(filename)
         except Exception:
             self.filename_preview_label.set_text("(unable to generate preview)")
@@ -694,31 +610,16 @@ class TextInserterDialog(GimpUi.Dialog):
 
         try:
             output_folder = Path(folder_path_str)
-            if not output_folder.exists():
-                output_folder.mkdir(parents=True, exist_ok=True)
+            selected_fields = self._get_selected_filename_fields()
 
-            # Save output directory for future use
-            save_output_dir(output_folder)
-            self.output_dir = output_folder
-
-            # Build row data with date
-            row_data = self._build_row_data(
+            # Save image using UseCase
+            output_path = TextInsertUseCase.save_image_with_metadata(
+                self.image,
+                output_folder,
                 self.csv_data[self.current_row_index],
-                strict=True,
+                self._get_selected_date(),
+                selected_fields,
             )
-
-            # Generate filename
-            filename = self._generate_filename_from_row(row_data)
-            output_path = output_folder / filename
-
-            # Save the image using a duplicate so the active image is not modified
-            export_image = self.image.duplicate()
-            try:
-                Exporter.save_png(export_image, output_path, flatten=False)
-            finally:
-                # Best-effort cleanup of the duplicate image
-                if hasattr(export_image, "delete"):
-                    export_image.delete()
 
             save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Saved: {output_path}")
