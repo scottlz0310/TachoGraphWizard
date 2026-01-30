@@ -10,7 +10,7 @@ with patch("tachograph_wizard.core.csv_parser.CSVParser.parse"), \
 with patch("tachograph_wizard.core.settings_manager.save_output_dir") as mock_save_dir, \
      patch("tachograph_wizard.core.exporter.Exporter.save_png") as mock_save_png:
 
-# For test_creates_output_folder_if_missing - patch at exporter location  
+# For test_creates_output_folder_if_missing - patch at exporter location
 with patch("tachograph_wizard.core.settings_manager.save_output_dir"), \
      patch("tachograph_wizard.core.exporter.Exporter.save_png"):
 
