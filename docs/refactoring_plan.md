@@ -464,6 +464,7 @@ def _debug_log(message: str) -> None:
 | 2026-01-29 | Phase 2 検証: 全テスト (103件) パス、コード品質チェック完了 | PR #40 |
 | 2026-01-30 | Phase 3 着手: image_cleanup.py / island_detector.py へ背景除去ロジックを分割 | - |
 | 2026-01-30 | Phase 3 完了: background_remover.py (702行→232行), 全テスト (149件) パス | - |
+| 2026-01-30 | 安定化対応: Text Inserter の保存先フォルダ選択バグを修正 | - |
 
 ### 11.3 Phase 1 完了サマリー
 
