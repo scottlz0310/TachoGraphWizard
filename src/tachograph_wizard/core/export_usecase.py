@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tachograph_wizard.core.template_exporter import TemplateExporter
-
 if TYPE_CHECKING:
     import gi
 
@@ -33,6 +31,20 @@ class ExportTemplateUseCase:
         return normalized
 
     @staticmethod
+    def compute_output_path(template_name: str, output_dir: Path) -> Path:
+        """テンプレートの出力パスを計算する.
+
+        Args:
+            template_name: テンプレート名
+            output_dir: 出力ディレクトリ
+
+        Returns:
+            出力パス
+        """
+        normalized_name = ExportTemplateUseCase.sanitize_template_name(template_name)
+        return output_dir / f"{normalized_name}.json"
+
+    @staticmethod
     def export_template(
         image: Gimp.Image,
         template_name: str,
@@ -53,6 +65,8 @@ class ExportTemplateUseCase:
         Raises:
             TemplateExportError: エクスポートに失敗した場合
         """
+        from tachograph_wizard.core.template_exporter import TemplateExporter
+
         normalized_name = ExportTemplateUseCase.sanitize_template_name(template_name)
         output_path = output_dir / f"{normalized_name}.json"
 

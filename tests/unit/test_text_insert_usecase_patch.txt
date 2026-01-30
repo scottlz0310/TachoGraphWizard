@@ -1,0 +1,19 @@
+# For test_loads_and_parses_csv - patch at CSV parser location
+with patch("tachograph_wizard.core.csv_parser.CSVParser.parse") as mock_parse, \
+     patch("tachograph_wizard.core.settings_manager.save_csv_path"):
+
+# For test_saves_csv_path - patch at settings_manager location
+with patch("tachograph_wizard.core.csv_parser.CSVParser.parse"), \
+     patch("tachograph_wizard.core.settings_manager.save_csv_path") as mock_save:
+
+# For test_saves_image_with_generated_filename - patch at exporter location
+with patch("tachograph_wizard.core.settings_manager.save_output_dir") as mock_save_dir, \
+     patch("tachograph_wizard.core.exporter.Exporter.save_png") as mock_save_png:
+
+# For test_creates_output_folder_if_missing - patch at exporter location  
+with patch("tachograph_wizard.core.settings_manager.save_output_dir"), \
+     patch("tachograph_wizard.core.exporter.Exporter.save_png"):
+
+# For test_cleans_up_duplicate_image - patch at exporter location
+with patch("tachograph_wizard.core.settings_manager.save_output_dir"), \
+     patch("tachograph_wizard.core.exporter.Exporter.save_png"):

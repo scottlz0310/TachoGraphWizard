@@ -235,8 +235,7 @@ class TestLoadCsv:
         csv_file = tmp_path / "test.csv"
         csv_file.write_text("vehicle_no,driver\nAB-1234,John\nCD-5678,Jane\n", encoding="utf-8")
 
-        with patch("tachograph_wizard.core.text_insert_usecase.save_csv_path"):
-            data = TextInsertUseCase.load_csv(csv_file)
+        data = TextInsertUseCase.load_csv(csv_file)
 
         assert len(data) == 2
         assert data[0]["vehicle_no"] == "AB-1234"
@@ -293,8 +292,8 @@ class TestInsertTextFromCsv:
         selected_date = datetime.date(2024, 3, 15)
 
         with (
-            patch("tachograph_wizard.core.text_insert_usecase.TemplateManager") as mock_tm,
-            patch("tachograph_wizard.core.text_insert_usecase.TextRenderer") as mock_tr,
+            patch("tachograph_wizard.core.template_manager.TemplateManager") as mock_tm,
+            patch("tachograph_wizard.core.text_renderer.TextRenderer") as mock_tr,
         ):
             mock_template = Mock()
             mock_tm.return_value.load_template.return_value = mock_template
@@ -344,7 +343,7 @@ class TestSaveImageWithMetadata:
 
         with (
             patch("tachograph_wizard.core.text_insert_usecase.save_output_dir") as mock_save_dir,
-            patch("tachograph_wizard.core.text_insert_usecase.Exporter") as mock_exporter,
+            patch("tachograph_wizard.core.exporter.Exporter.save_png") as mock_save_png,
         ):
             output_path = TextInsertUseCase.save_image_with_metadata(
                 mock_image,
@@ -358,7 +357,7 @@ class TestSaveImageWithMetadata:
             assert output_path == output_folder / "20240315_AB-1234.png"
             mock_save_dir.assert_called_once_with(output_folder)
             mock_image.duplicate.assert_called_once()
-            mock_exporter.save_png.assert_called_once_with(
+            mock_save_png.assert_called_once_with(
                 mock_duplicate,
                 output_path,
                 flatten=False,
@@ -384,7 +383,7 @@ class TestSaveImageWithMetadata:
 
         with (
             patch("tachograph_wizard.core.text_insert_usecase.save_output_dir"),
-            patch("tachograph_wizard.core.text_insert_usecase.Exporter"),
+            patch("tachograph_wizard.core.exporter.Exporter.save_png"),
         ):
             TextInsertUseCase.save_image_with_metadata(
                 mock_image,
@@ -414,7 +413,7 @@ class TestSaveImageWithMetadata:
 
         with (
             patch("tachograph_wizard.core.text_insert_usecase.save_output_dir"),
-            patch("tachograph_wizard.core.text_insert_usecase.Exporter"),
+            patch("tachograph_wizard.core.exporter.Exporter.save_png"),
         ):
             TextInsertUseCase.save_image_with_metadata(
                 mock_image,

@@ -6,12 +6,7 @@ import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tachograph_wizard.core.csv_parser import CSVParser
-from tachograph_wizard.core.exporter import Exporter
-from tachograph_wizard.core.filename_generator import generate_filename
-from tachograph_wizard.core.template_manager import TemplateManager
-from tachograph_wizard.core.text_renderer import TextRenderer
-from tachograph_wizard.ui.settings_manager import parse_date_string, save_csv_path, save_output_dir
+from tachograph_wizard.core.settings_manager import parse_date_string, save_csv_path, save_output_dir
 
 if TYPE_CHECKING:
     import gi
@@ -132,6 +127,8 @@ class TextInsertUseCase:
         Returns:
             生成されたファイル名
         """
+        from tachograph_wizard.core.filename_generator import generate_filename
+
         return generate_filename(
             date=selected_date,
             vehicle_number=row_data.get("vehicle_no", "") if "vehicle_no" in selected_fields else "",
@@ -152,6 +149,8 @@ class TextInsertUseCase:
             FileNotFoundError: ファイルが見つからない場合
             ValueError: CSVのパースに失敗した場合
         """
+        from tachograph_wizard.core.csv_parser import CSVParser
+
         csv_data = CSVParser.parse(csv_path)
         save_csv_path(csv_path)
         return csv_data
@@ -177,6 +176,9 @@ class TextInsertUseCase:
         Raises:
             CsvDateError: 日付が無効な場合
         """
+        from tachograph_wizard.core.template_manager import TemplateManager
+        from tachograph_wizard.core.text_renderer import TextRenderer
+
         template_manager = TemplateManager()
         template = template_manager.load_template(template_path)
 
@@ -208,6 +210,8 @@ class TextInsertUseCase:
         Raises:
             CsvDateError: 日付が無効な場合
         """
+        from tachograph_wizard.core.exporter import Exporter
+
         if not output_folder.exists():
             output_folder.mkdir(parents=True, exist_ok=True)
 

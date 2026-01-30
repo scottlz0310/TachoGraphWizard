@@ -181,10 +181,8 @@ class TemplateExporterDialog(GimpUi.Dialog):
             self._show_error("Please select an output directory")
             return
 
-        # Check for overwrite before calling UseCase
-        # Note: This duplicates the path construction in the UseCase,
-        # but maintains consistency with the original implementation
-        output_path = Path(output_dir) / f"{ExportTemplateUseCase.sanitize_template_name(template_name)}.json"
+        # Compute output path once using UseCase helper
+        output_path = ExportTemplateUseCase.compute_output_path(template_name, Path(output_dir))
 
         if output_path.exists():
             if not self._confirm_overwrite(output_path):

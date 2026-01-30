@@ -61,6 +61,32 @@ class TestSanitizeTemplateName:
         assert result == ""
 
 
+class TestComputeOutputPath:
+    """Test compute_output_path method."""
+
+    def test_computes_path_with_sanitization(self) -> None:
+        """Test computing output path with sanitization."""
+        from tachograph_wizard.core.export_usecase import ExportTemplateUseCase
+
+        output_dir = Path("/tmp/templates")  # noqa: S108
+        template_name = "  my-template.json  "
+
+        result = ExportTemplateUseCase.compute_output_path(template_name, output_dir)
+
+        assert result == output_dir / "my-template.json"
+
+    def test_computes_path_without_extension(self) -> None:
+        """Test computing output path for name without extension."""
+        from tachograph_wizard.core.export_usecase import ExportTemplateUseCase
+
+        output_dir = Path("/tmp/templates")  # noqa: S108
+        template_name = "my-template"
+
+        result = ExportTemplateUseCase.compute_output_path(template_name, output_dir)
+
+        assert result == output_dir / "my-template.json"
+
+
 class TestExportTemplate:
     """Test export_template method."""
 
@@ -77,7 +103,8 @@ class TestExportTemplate:
         output_dir.mkdir()
         description = "Test template description"
 
-        with patch("tachograph_wizard.core.export_usecase.TemplateExporter") as mock_exporter_cls:
+        # Patch at the point of import inside the export_template method
+        with patch("tachograph_wizard.core.template_exporter.TemplateExporter") as mock_exporter_cls:
             mock_exporter = Mock()
             mock_exporter_cls.return_value = mock_exporter
             expected_path = output_dir / "test-template.json"
@@ -110,7 +137,7 @@ class TestExportTemplate:
         output_dir = tmp_path / "templates"
         output_dir.mkdir()
 
-        with patch("tachograph_wizard.core.export_usecase.TemplateExporter") as mock_exporter_cls:
+        with patch("tachograph_wizard.core.template_exporter.TemplateExporter") as mock_exporter_cls:
             mock_exporter = Mock()
             mock_exporter_cls.return_value = mock_exporter
             expected_path = output_dir / "test-template.json"
@@ -141,7 +168,7 @@ class TestExportTemplate:
         output_dir.mkdir()
         description = "Custom description"
 
-        with patch("tachograph_wizard.core.export_usecase.TemplateExporter") as mock_exporter_cls:
+        with patch("tachograph_wizard.core.template_exporter.TemplateExporter") as mock_exporter_cls:
             mock_exporter = Mock()
             mock_exporter_cls.return_value = mock_exporter
             expected_path = output_dir / "test-template.json"
@@ -170,7 +197,7 @@ class TestExportTemplate:
         output_dir = tmp_path / "templates"
         output_dir.mkdir()
 
-        with patch("tachograph_wizard.core.export_usecase.TemplateExporter") as mock_exporter_cls:
+        with patch("tachograph_wizard.core.template_exporter.TemplateExporter") as mock_exporter_cls:
             mock_exporter = Mock()
             mock_exporter_cls.return_value = mock_exporter
             mock_exporter.export_template.side_effect = TemplateExportError("Export failed")
@@ -194,7 +221,7 @@ class TestExportTemplate:
         output_dir = tmp_path / "templates"
         output_dir.mkdir()
 
-        with patch("tachograph_wizard.core.export_usecase.TemplateExporter") as mock_exporter_cls:
+        with patch("tachograph_wizard.core.template_exporter.TemplateExporter") as mock_exporter_cls:
             mock_exporter = Mock()
             mock_exporter_cls.return_value = mock_exporter
             expected_path = output_dir / "test-template.json"

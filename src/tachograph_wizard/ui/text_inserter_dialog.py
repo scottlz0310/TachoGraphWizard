@@ -16,9 +16,7 @@ gi.require_version("GLib", "2.0")
 
 from gi.repository import Gimp, GimpUi, GLib, Gtk
 
-from tachograph_wizard.core.template_manager import TemplateManager
-from tachograph_wizard.core.text_insert_usecase import CsvDateError, TextInsertUseCase
-from tachograph_wizard.ui.settings_manager import (
+from tachograph_wizard.core.settings_manager import (
     load_csv_path,
     load_filename_fields,
     load_last_used_date,
@@ -30,6 +28,8 @@ from tachograph_wizard.ui.settings_manager import (
     save_template_dir,
     save_window_size,
 )
+from tachograph_wizard.core.template_manager import TemplateManager
+from tachograph_wizard.core.text_insert_usecase import CsvDateError, TextInsertUseCase
 
 
 def _debug_log(message: str) -> None:
@@ -578,15 +578,16 @@ class TextInserterDialog(GimpUi.Dialog):
             return
 
         try:
+            selected_date = self._get_selected_date()
             row_data = TextInsertUseCase.build_row_data(
                 self.csv_data[self.current_row_index],
-                self._get_selected_date(),
+                selected_date,
                 strict=False,
             )
             selected_fields = self._get_selected_filename_fields()
             filename = TextInsertUseCase.generate_filename_from_row(
                 row_data,
-                self._get_selected_date(),
+                selected_date,
                 selected_fields,
             )
             self.filename_preview_label.set_text(filename)
