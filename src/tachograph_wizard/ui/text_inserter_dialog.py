@@ -83,140 +83,85 @@ class TextInserterDialog(GimpUi.Dialog):
         self.add_button("_Cancel", Gtk.ResponseType.CANCEL)
         self.add_button("_OK", Gtk.ResponseType.OK)
 
-        # Create UI
-        self._create_ui()
+        # Load UI from .ui file
+        self._load_ui()
 
-    def _create_ui(self) -> None:
-        """Create the dialog UI."""
+    def _load_ui(self) -> None:
+        """Load the dialog UI from .ui file."""
+        # Load UI definition
+        ui_file = Path(__file__).parent / "text_inserter_dialog.ui"
+        builder = Gtk.Builder()
+        builder.add_from_file(str(ui_file))
+
+        # Get the main content box
+        main_content = builder.get_object("main_content")
+        if main_content is None:
+            msg = "Failed to load main_content from UI file"
+            raise RuntimeError(msg)
+
+        # Add to dialog
         content_area = self.get_content_area()
-        content_area.set_spacing(12)
+        content_area.pack_start(main_content, True, True, 0)
 
-        # Create a scrolled window for the entire content
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_min_content_height(500)
+        # Get widget references
+        self.template_dir_button = builder.get_object("template_dir_button")
+        self.template_combo = builder.get_object("template_combo")
+        self.csv_chooser = builder.get_object("csv_chooser")
+        self.date_calendar = builder.get_object("date_calendar")
+        self.row_adjustment = builder.get_object("row_adjustment")
+        self.row_spinner = builder.get_object("row_spinner")
+        self.row_count_label = builder.get_object("row_count_label")
+        self.preview_text = builder.get_object("preview_text")
+        self.output_folder_button = builder.get_object("output_folder_button")
+        self.filename_preview_label = builder.get_object("filename_preview_label")
+        self.status_label = builder.get_object("status_label")
 
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        main_box.set_border_width(6)
+        # Get filename field checkboxes
+        self.filename_field_checks["date"] = builder.get_object("field_date")
+        self.filename_field_checks["vehicle_no"] = builder.get_object("field_vehicle_no")
+        self.filename_field_checks["driver"] = builder.get_object("field_driver")
 
-        # Welcome label
-        welcome_label = Gtk.Label()
-        welcome_label.set_markup(
-            "<b>Tachograph Text Inserter</b>\n\nInsert text from CSV files using templates.",
-        )
-        welcome_label.set_line_wrap(True)
-        main_box.pack_start(welcome_label, False, False, 0)
+        # Verify all required widgets were loaded
+        required_widgets = {
+            "template_dir_button": self.template_dir_button,
+            "template_combo": self.template_combo,
+            "csv_chooser": self.csv_chooser,
+            "date_calendar": self.date_calendar,
+            "row_spinner": self.row_spinner,
+            "preview_text": self.preview_text,
+            "output_folder_button": self.output_folder_button,
+            "filename_preview_label": self.filename_preview_label,
+            "status_label": self.status_label,
+        }
+        for widget_name, widget in required_widgets.items():
+            if widget is None:
+                msg = f"Failed to load widget '{widget_name}' from UI file"
+                raise RuntimeError(msg)
 
-        # Template selection section
-        template_frame = self._create_template_section()
-        main_box.pack_start(template_frame, False, False, 0)
+        # Connect signals
+        builder.connect_signals(self)
 
-        # CSV file selection section
-        csv_frame = self._create_csv_section()
-        main_box.pack_start(csv_frame, False, False, 0)
+        # Initialize UI state
+        self._initialize_ui_state()
 
-        # Date selection section
-        date_frame = self._create_date_section()
-        main_box.pack_start(date_frame, False, False, 0)
-
-        # Row selection section
-        row_frame = self._create_row_section()
-        main_box.pack_start(row_frame, False, False, 0)
-
-        # Preview section
-        preview_frame = self._create_preview_section()
-        main_box.pack_start(preview_frame, False, False, 0)
-
-        # Insert button
-        insert_button = Gtk.Button(label="Insert Text")
-        insert_button.connect("clicked", self._on_insert_clicked)
-        main_box.pack_start(insert_button, False, False, 0)
-
-        # Save section
-        save_frame = self._create_save_section()
-        main_box.pack_start(save_frame, False, False, 0)
-
-        scrolled_window.add(main_box)
-        content_area.pack_start(scrolled_window, True, True, 0)
-
-        # Status label
-        self.status_label = Gtk.Label()
-        self.status_label.set_text("Ready")
-        self.status_label.set_xalign(0.0)
-        content_area.pack_start(self.status_label, False, False, 0)
-
-        self._refresh_template_list(self.template_dir)
         self.show_all()
 
-    def _create_template_section(self) -> Gtk.Frame:
-        """Create the template selection section."""
-        frame = Gtk.Frame(label="Step 1: Select Template")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        dir_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        dir_label = Gtk.Label(label="Template Folder:")
-        dir_box.pack_start(dir_label, False, False, 0)
-
-        self.template_dir_button = Gtk.FileChooserButton(
-            title="Select Template Folder",
-            action=Gtk.FileChooserAction.SELECT_FOLDER,
-        )
+    def _initialize_ui_state(self) -> None:
+        """Initialize UI widget states with saved settings."""
+        # Set template directory
         if self.template_dir.exists():
             self.template_dir_button.set_current_folder(str(self.template_dir))
         elif self.default_templates_dir.exists():
             self.template_dir_button.set_current_folder(str(self.default_templates_dir))
         else:
             self.template_dir_button.set_current_folder(str(Path.home()))
-        dir_box.pack_start(self.template_dir_button, True, True, 0)
-        box.pack_start(dir_box, False, False, 0)
 
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        load_button = Gtk.Button(label="Load Templates")
-        load_button.connect("clicked", self._on_load_templates_clicked)
-        button_box.pack_start(load_button, False, False, 0)
-
-        default_button = Gtk.Button(label="Use Default Templates")
-        default_button.connect("clicked", self._on_use_default_templates_clicked)
-        button_box.pack_start(default_button, False, False, 0)
-        box.pack_start(button_box, False, False, 0)
-
-        # Template combo box
-        combo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        label = Gtk.Label(label="Template:")
-        combo_box.pack_start(label, False, False, 0)
-
-        self.template_combo = Gtk.ComboBoxText()
-        combo_box.pack_start(self.template_combo, True, True, 0)
-        box.pack_start(combo_box, False, False, 0)
-
-        return frame
-
-    def _create_csv_section(self) -> Gtk.Frame:
-        """Create the CSV file selection section."""
-        frame = Gtk.Frame(label="Step 2: Load CSV File")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        # CSV file chooser
-        file_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        label = Gtk.Label(label="CSV File:")
-        file_box.pack_start(label, False, False, 0)
-
-        self.csv_chooser = Gtk.FileChooserButton(
-            title="Select CSV File",
-            action=Gtk.FileChooserAction.OPEN,
-        )
-
-        # Add CSV filter
+        # Add CSV file filters
         csv_filter = Gtk.FileFilter()
         csv_filter.set_name("CSV files")
         csv_filter.add_pattern("*.csv")
         self.csv_chooser.add_filter(csv_filter)
 
-        # Add all files filter
         all_filter = Gtk.FileFilter()
         all_filter.set_name("All files")
         all_filter.add_pattern("*")
@@ -226,147 +171,56 @@ class TextInserterDialog(GimpUi.Dialog):
         if self.last_csv_path and self.last_csv_path.exists():
             self.csv_chooser.set_filename(str(self.last_csv_path))
 
-        file_box.pack_start(self.csv_chooser, True, True, 0)
-        box.pack_start(file_box, False, False, 0)
-
-        # Load button
-        load_button = Gtk.Button(label="Load CSV")
-        load_button.connect("clicked", self._on_load_csv_clicked)
-        box.pack_start(load_button, False, False, 0)
-
-        return frame
-
-    def _create_date_section(self) -> Gtk.Frame:
-        """Create the date selection section."""
-        frame = Gtk.Frame(label="Step 3: Select Date")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        self.date_calendar = Gtk.Calendar()
+        # Set calendar date
         self._set_calendar_date(self.default_date)
-        self.date_calendar.connect("day-selected", self._on_date_changed)
-        self.date_calendar.connect("month-changed", self._on_date_changed)
-        box.pack_start(self.date_calendar, False, False, 0)
 
-        return frame
-
-    def _create_row_section(self) -> Gtk.Frame:
-        """Create the row selection section."""
-        frame = Gtk.Frame(label="Step 4: Select Row")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        # Row spinner
-        spinner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        label = Gtk.Label(label="Row:")
-        spinner_box.pack_start(label, False, False, 0)
-
-        self.row_adjustment = Gtk.Adjustment(
-            value=1,
-            lower=1,
-            upper=1,
-            step_increment=1,
-            page_increment=1,
-        )
-        self.row_spinner = Gtk.SpinButton(adjustment=self.row_adjustment, climb_rate=1, digits=0)
-        self.row_spinner.connect("value-changed", self._on_row_changed)
-        spinner_box.pack_start(self.row_spinner, True, True, 0)
-
-        self.row_count_label = Gtk.Label(label="of 0")
-        spinner_box.pack_start(self.row_count_label, False, False, 0)
-
-        box.pack_start(spinner_box, False, False, 0)
-
-        return frame
-
-    def _create_preview_section(self) -> Gtk.Frame:
-        """Create the preview section."""
-        frame = Gtk.Frame(label="Preview")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        # Scrolled window for preview
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_min_content_height(150)
-
-        # Preview text view
-        self.preview_text = Gtk.TextView()
-        self.preview_text.set_editable(False)
-        self.preview_text.set_wrap_mode(Gtk.WrapMode.WORD)
-        scrolled.add(self.preview_text)
-
-        box.pack_start(scrolled, True, True, 0)
-
-        return frame
-
-    def _create_save_section(self) -> Gtk.Frame:
-        """Create the save section with output folder and filename field selection."""
-        frame = Gtk.Frame(label="Step 6: Save Image")
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_border_width(6)
-        frame.add(box)
-
-        # Output folder selection
-        folder_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        folder_label = Gtk.Label(label="Output Folder:")
-        folder_box.pack_start(folder_label, False, False, 0)
-
-        self.output_folder_button = Gtk.FileChooserButton(
-            title="Select Output Folder",
-            action=Gtk.FileChooserAction.SELECT_FOLDER,
-        )
+        # Set output directory
         if self.output_dir.exists():
             self.output_folder_button.set_filename(str(self.output_dir))
         else:
             self.output_folder_button.set_filename(str(Path.home()))
-        folder_box.pack_start(self.output_folder_button, True, True, 0)
-        box.pack_start(folder_box, False, False, 0)
-
-        # Filename field selection
-        fields_label = Gtk.Label()
-        fields_label.set_markup("<b>Select fields for filename:</b>")
-        fields_label.set_xalign(0.0)
-        box.pack_start(fields_label, False, False, 0)
 
         # Load saved filename field selections
         saved_fields = self.settings.load_filename_fields()
-
-        fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
-            check = Gtk.CheckButton(label=field_label)
-            # Date is always included (mandatory), other fields are optional
-            if field_key == "date":
-                check.set_active(True)
-                check.set_sensitive(False)  # Disable date checkbox - always included
-            else:
-                # Set checkbox state based on saved settings
+        for field_key, check in self.filename_field_checks.items():
+            if field_key != "date":  # Date is always included (already set in .ui)
                 check.set_active(field_key in saved_fields)
-            check.connect("toggled", self._on_filename_field_toggled)
-            self.filename_field_checks[field_key] = check
-            fields_box.pack_start(check, False, False, 0)
-        box.pack_start(fields_box, False, False, 0)
 
-        # Filename preview
-        preview_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        preview_label = Gtk.Label(label="Filename:")
-        preview_box.pack_start(preview_label, False, False, 0)
+        # Load templates
+        self._refresh_template_list(self.template_dir)
 
-        self.filename_preview_label = Gtk.Label()
-        self.filename_preview_label.set_xalign(0.0)
-        self.filename_preview_label.set_text("(load CSV to preview)")
-        preview_box.pack_start(self.filename_preview_label, True, True, 0)
-        box.pack_start(preview_box, False, False, 0)
+    # Signal handlers (called from .ui file)
+    def on_load_templates_clicked(self, button: Gtk.Button) -> None:
+        """Handle loading templates from the selected folder."""
+        self._on_load_templates_clicked(button)
 
-        # Save button
-        save_button = Gtk.Button(label="Save Image")
-        save_button.connect("clicked", self._on_save_clicked)
-        box.pack_start(save_button, False, False, 0)
+    def on_use_default_templates_clicked(self, button: Gtk.Button) -> None:
+        """Reset templates to the built-in default folder."""
+        self._on_use_default_templates_clicked(button)
 
-        return frame
+    def on_load_csv_clicked(self, button: Gtk.Button) -> None:
+        """Handle load CSV button click."""
+        self._on_load_csv_clicked(button)
+
+    def on_date_changed(self, calendar: Gtk.Calendar) -> None:
+        """Handle date selection changes."""
+        self._on_date_changed(calendar)
+
+    def on_row_changed(self, spinner: Gtk.SpinButton) -> None:
+        """Handle row spinner value change."""
+        self._on_row_changed(spinner)
+
+    def on_insert_clicked(self, button: Gtk.Button) -> None:
+        """Handle insert button click."""
+        self._on_insert_clicked(button)
+
+    def on_filename_field_toggled(self, check: Gtk.CheckButton) -> None:
+        """Handle filename field checkbox toggle."""
+        self._on_filename_field_toggled(check)
+
+    def on_save_clicked(self, button: Gtk.Button) -> None:
+        """Handle save button click."""
+        self._on_save_clicked(button)
 
     def _refresh_template_list(self, templates_dir: Path) -> bool:
         """Load templates from the specified directory."""

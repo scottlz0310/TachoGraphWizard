@@ -610,6 +610,56 @@ class TestTextInserterDialogCancel:
         mock_image.remove_layer.assert_called_once_with(mock_layer_valid)
 
 
+class TestTextInserterUILoad:
+    """Test text inserter dialog UI loading from .ui file."""
+
+    def test_ui_file_exists(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """UI file exists and is readable."""
+        from pathlib import Path
+
+        # Check that .ui file exists
+        ui_file = Path(__file__).parent.parent.parent / "src" / "tachograph_wizard" / "ui" / "text_inserter_dialog.ui"
+        assert ui_file.exists(), f"UI file not found: {ui_file}"
+
+        # Verify it's readable and contains XML
+        content = ui_file.read_text(encoding="utf-8")
+        assert content.startswith('<?xml version="1.0"'), "UI file is not valid XML"
+        assert "<interface>" in content, "UI file is not valid GTK interface definition"
+
+    def test_required_widgets_present_in_ui_file(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """All required widget IDs are present in the .ui file."""
+        from pathlib import Path
+
+        # Required widget IDs as specified in the issue
+        required_widget_ids = [
+            "template_dir_button",
+            "template_combo",
+            "csv_chooser",
+            "date_calendar",
+            "row_spinner",
+            "preview_text",
+            "output_folder_button",
+            "filename_preview_label",
+            "status_label",
+        ]
+
+        # Load the .ui file and check for widget IDs
+        ui_file = Path(__file__).parent.parent.parent / "src" / "tachograph_wizard" / "ui" / "text_inserter_dialog.ui"
+        assert ui_file.exists(), f"UI file not found: {ui_file}"
+
+        ui_content = ui_file.read_text(encoding="utf-8")
+
+        # Check each required widget ID is present
+        for widget_id in required_widget_ids:
+            assert f'id="{widget_id}"' in ui_content, f"Required widget ID '{widget_id}' not found in .ui file"
+
+
 class TestTextInserterProcedure:
     """Test text inserter procedure functionality."""
 
