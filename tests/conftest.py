@@ -21,7 +21,7 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_gimp_modules() -> Iterator[tuple[MagicMock, MagicMock, MagicMock]]:
     """Mock the GIMP gi.repository modules.
 
