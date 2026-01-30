@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
@@ -284,3 +286,57 @@ class TestIslandDetectorModule:
             remove_garbage_keep_largest_island(mock_drawable, threshold=10.0)
 
         mock_image.remove_layer.assert_called_once_with(mock_drawable.copy.return_value)
+
+
+class TestLoggingUtil:
+    """Test logging_util debug_log behavior."""
+
+    def test_debug_log_writes_log_line(self, tmp_path: Path) -> None:
+        """Test debug_log writes expected line to file."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        with patch.dict(os.environ, {"TEMP": str(tmp_path)}):
+            debug_log("hello", module="test_module")
+
+        log_path = tmp_path / "tachograph_wizard.log"
+        assert log_path.exists()
+        content = log_path.read_text(encoding="utf-8")
+        assert "test_module: hello" in content
+
+    def test_debug_log_no_env_returns(self, tmp_path: Path) -> None:
+        """Test debug_log returns without env variables."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        env_patch = {"TEMP": "", "TMP": "", "LOCALAPPDATA": ""}
+        with patch.dict(os.environ, env_patch, clear=True):
+            debug_log("hello", module="test_module")
+
+        assert not (tmp_path / "tachograph_wizard.log").exists()
+
+    def test_debug_log_appends(self, tmp_path: Path) -> None:
+        """Test debug_log appends to existing file."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        log_path = tmp_path / "tachograph_wizard.log"
+        log_path.write_text("seed\n", encoding="utf-8")
+
+        with patch.dict(os.environ, {"TEMP": str(tmp_path)}):
+            debug_log("next", module="test_module")
+
+        content = log_path.read_text(encoding="utf-8")
+        assert "seed" in content
+        assert "test_module: next" in content
+
+    def test_debug_log_handles_open_failure(self, tmp_path: Path) -> None:
+        """Test debug_log gracefully handles open failures."""
+        from tachograph_wizard.core import logging_util
+
+        with (
+            patch.dict(os.environ, {"TEMP": str(tmp_path)}),
+            patch.object(
+                logging_util.Path,
+                "open",
+                side_effect=OSError("fail"),
+            ),
+        ):
+            logging_util.debug_log("hello", module="test_module")

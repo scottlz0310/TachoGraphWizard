@@ -6,10 +6,6 @@ scanned image artifacts using GEGL filters.
 
 from __future__ import annotations
 
-import datetime
-import os
-from pathlib import Path
-
 import gi
 
 gi.require_version("Gimp", "3.0")
@@ -19,21 +15,13 @@ from gi.repository import Gegl, Gimp, GObject
 
 from tachograph_wizard.core.image_cleanup import add_center_guides, auto_cleanup_and_crop, despeckle
 from tachograph_wizard.core.island_detector import remove_garbage_keep_largest_island
+from tachograph_wizard.core.logging_util import debug_log
 from tachograph_wizard.core.pdb_runner import run_pdb_procedure
 
 
 def _debug_log(message: str) -> None:
     """Write debug message to log file."""
-    try:
-        base = os.environ.get("TEMP") or os.environ.get("TMP") or os.environ.get("LOCALAPPDATA")
-        if not base:
-            return
-        log_path = Path(base) / "tachograph_wizard.log"
-        ts = datetime.datetime.now(tz=datetime.UTC).isoformat(timespec="seconds")
-        with log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"[{ts}] background_remover: {message}\n")
-    except Exception:
-        return
+    debug_log(message, module="background_remover")
 
 
 class BackgroundRemover:
