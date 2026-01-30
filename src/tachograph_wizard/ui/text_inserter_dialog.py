@@ -16,20 +16,9 @@ gi.require_version("GLib", "2.0")
 
 from gi.repository import Gimp, GimpUi, GLib, Gtk
 
-from tachograph_wizard.core.settings_manager import (
-    load_csv_path,
-    load_filename_fields,
-    load_last_used_date,
-    load_output_dir,
-    load_template_dir,
-    load_window_size,
-    save_filename_fields,
-    save_last_used_date,
-    save_template_dir,
-    save_window_size,
-)
 from tachograph_wizard.core.template_manager import TemplateManager
 from tachograph_wizard.core.text_insert_usecase import CsvDateError, TextInsertUseCase
+from tachograph_wizard.ui.settings import Settings
 
 
 def _debug_log(message: str) -> None:
@@ -68,21 +57,22 @@ class TextInserterDialog(GimpUi.Dialog):
         )
 
         self.image = image
+        self.settings = Settings()
         self.template_manager = TemplateManager()
         self.default_templates_dir = self.template_manager.get_templates_dir()
-        self.template_dir = load_template_dir(self.default_templates_dir)
+        self.template_dir = self.settings.load_template_dir(self.default_templates_dir)
         self.template_paths: dict[str, Path] = {}
         self.csv_data: list[dict[str, str]] = []
         self.current_row_index = 0
-        self.default_date = load_last_used_date() or datetime.date.today()
-        self.last_csv_path = load_csv_path()
-        self.output_dir = load_output_dir() or Path.home()
+        self.default_date = self.settings.load_last_used_date() or datetime.date.today()
+        self.last_csv_path = self.settings.load_csv_path()
+        self.output_dir = self.settings.load_output_dir() or Path.home()
         self.filename_field_checks: dict[str, Gtk.CheckButton] = {}
         self._resize_save_timeout_id: int | None = None
         self._inserted_layers: list[Gimp.Layer] = []  # Track layers added during session
 
         # Load and set window size
-        width, height = load_window_size()
+        width, height = self.settings.load_window_size()
         self.set_default_size(width, height)
         self.set_border_width(12)
 
@@ -343,7 +333,7 @@ class TextInserterDialog(GimpUi.Dialog):
         box.pack_start(fields_label, False, False, 0)
 
         # Load saved filename field selections
-        saved_fields = load_filename_fields()
+        saved_fields = self.settings.load_filename_fields()
 
         fields_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         for field_key, field_label in self.FILENAME_FIELD_OPTIONS:
@@ -428,7 +418,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error(f"No templates found in {templates_dir}")
             return
 
-        save_template_dir(templates_dir)
+        self.settings.save_template_dir(templates_dir)
         self.status_label.set_text(f"Loaded {len(self.template_paths)} templates")
 
     def _on_use_default_templates_clicked(self, button: Gtk.Button) -> None:
@@ -439,7 +429,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error("Default templates folder is missing")
             return
 
-        save_template_dir(self.default_templates_dir)
+        self.settings.save_template_dir(self.default_templates_dir)
         self.status_label.set_text("Loaded default templates")
 
     def _set_calendar_date(self, date_value: datetime.date) -> None:
@@ -550,7 +540,7 @@ class TextInserterDialog(GimpUi.Dialog):
             # Flush displays
             Gimp.displays_flush()
 
-            save_last_used_date(self._get_selected_date())
+            self.settings.save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Inserted {len(layers)} text layers")
 
         except Exception as e:
@@ -561,7 +551,7 @@ class TextInserterDialog(GimpUi.Dialog):
         """Handle filename field checkbox toggle."""
         # Save the selected fields to settings
         selected_fields = self._get_selected_filename_fields()
-        save_filename_fields(selected_fields)
+        self.settings.save_filename_fields(selected_fields)
         self._update_filename_preview()
 
     def _get_selected_filename_fields(self) -> list[str]:
@@ -622,7 +612,7 @@ class TextInserterDialog(GimpUi.Dialog):
                 selected_fields,
             )
 
-            save_last_used_date(self._get_selected_date())
+            self.settings.save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Saved: {output_path}")
 
         except Exception as e:
@@ -661,7 +651,7 @@ class TextInserterDialog(GimpUi.Dialog):
             False to prevent the timeout from repeating.
         """
         width, height = self.get_size()
-        save_window_size(width, height)
+        self.settings.save_window_size(width, height)
         self._resize_save_timeout_id = None
         return False  # Return False to stop the timeout from repeating
 
