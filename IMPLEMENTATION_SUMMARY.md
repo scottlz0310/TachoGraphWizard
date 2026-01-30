@@ -117,8 +117,8 @@ ui/text_inserter_dialog.py
 
 Phase 1 完了により、次のフェーズに進む準備が整いました:
 
-- **Phase 2**: `core/image_splitter.py` (778行) の分割
-- **Phase 3**: `core/background_remover.py` (702行) の分割
+- ✅ **Phase 2**: `core/image_splitter.py` (655行) の分割（完了）
+- ⏳ **Phase 3**: `core/background_remover.py` (233行) の分割（進行中）
 
 ## レビューポイント
 
@@ -266,4 +266,50 @@ core/image_splitter.py (655行)
 
 Phase 2 完了により、次のフェーズに進む準備が整いました:
 
-- **Phase 3**: `core/background_remover.py` (843行) の分割
+- ⏳ **Phase 3**: `core/background_remover.py` (233行) の分割（image_cleanup.py / island_detector.py 作成済み）
+
+---
+
+# Phase 3 リファクタリング進捗サマリー
+
+## 実装日
+2026-01-30
+
+## 目的
+`docs/refactoring_plan.md` の Phase 3 を開始:
+- `core/background_remover.py` の分割を進める
+- 背景除去の前処理と島検出ロジックを独立モジュール化
+
+## 実装内容（進行中）
+
+### 1. 画像クリーンアップモジュール（新規）
+**ファイル**: `src/tachograph_wizard/core/image_cleanup.py` (213行)
+
+**機能**:
+- despeckle / auto_cleanup_and_crop / add_center_guides を提供
+- 背景除去の前処理を集約
+
+### 2. 島検出モジュール（新規）
+**ファイル**: `src/tachograph_wizard/core/island_detector.py` (490行)
+
+**機能**:
+- `remove_garbage_keep_largest_island` を移管
+- 閾値処理と選択ロジックの整理
+
+### 3. 背景除去モジュール（更新）
+**ファイル**: `src/tachograph_wizard/core/background_remover.py` (233行)
+
+**変更内容**:
+- `image_cleanup` / `island_detector` へ委譲
+- 背景除去のAPIを維持しつつ内部処理を分離
+
+### 4. テスト
+**ファイル**: `tests/unit/test_background_remover.py`
+
+- 委譲処理とフォールバックのテストを追加
+- ✅ 全テスト: 133件パス
+- ✅ ruff format / ruff check / basedpyright: パス
+
+## 残課題
+- `island_detector.py` が 490行のため、内部ロジックの更なる分割を検討
+- GIMP 環境での手動確認と最終レビュー
