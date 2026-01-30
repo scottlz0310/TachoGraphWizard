@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 class TestBackgroundRemoverAddCenterGuides:
@@ -136,3 +138,205 @@ class TestBackgroundRemoverProcessBackgroundGuides:
         # Verify guides were added
         mock_image.add_vguide.assert_called_once_with(500)
         mock_image.add_hguide.assert_called_once_with(500)
+
+
+class TestBackgroundRemoverDelegates:
+    """Test BackgroundRemover delegates to refactored modules."""
+
+    def test_despeckle_delegates(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test despeckle delegates to image_cleanup."""
+        from tachograph_wizard.core.background_remover import BackgroundRemover
+
+        mock_drawable = MagicMock()
+        with patch("tachograph_wizard.core.background_remover.despeckle") as mock_despeckle:
+            BackgroundRemover.despeckle(mock_drawable, radius=5)
+
+        mock_despeckle.assert_called_once_with(mock_drawable, radius=5)
+
+    def test_auto_cleanup_and_crop_delegates(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test auto_cleanup_and_crop delegates to image_cleanup."""
+        from tachograph_wizard.core.background_remover import BackgroundRemover
+
+        mock_drawable = MagicMock()
+        with patch("tachograph_wizard.core.background_remover.auto_cleanup_and_crop") as mock_cleanup:
+            BackgroundRemover.auto_cleanup_and_crop(mock_drawable, ellipse_padding=12)
+
+        mock_cleanup.assert_called_once_with(mock_drawable, ellipse_padding=12)
+
+    def test_remove_garbage_keep_largest_island_delegates(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test remove_garbage_keep_largest_island delegates to island_detector."""
+        from tachograph_wizard.core.background_remover import BackgroundRemover
+
+        mock_drawable = MagicMock()
+        with patch(
+            "tachograph_wizard.core.background_remover.remove_garbage_keep_largest_island",
+        ) as mock_remove:
+            BackgroundRemover.remove_garbage_keep_largest_island(mock_drawable, threshold=22.5)
+
+        mock_remove.assert_called_once_with(mock_drawable, threshold=22.5)
+
+
+class TestImageCleanupModule:
+    """Test image_cleanup module entrypoints."""
+
+    def test_auto_cleanup_adds_alpha_and_crops(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test auto_cleanup_and_crop performs basic selection flow."""
+        from tachograph_wizard.core.image_cleanup import auto_cleanup_and_crop
+
+        mock_image = MagicMock()
+        mock_image.get_width.return_value = 100
+        mock_image.get_height.return_value = 80
+        mock_image.select_ellipse = MagicMock()
+        mock_image.autocrop = MagicMock()
+
+        mock_drawable = MagicMock()
+        mock_drawable.get_image.return_value = mock_image
+        mock_drawable.has_alpha.return_value = False
+
+        auto_cleanup_and_crop(mock_drawable, ellipse_padding=10)
+
+        mock_drawable.add_alpha.assert_called_once()
+        args = mock_image.select_ellipse.call_args.args
+        assert args[1:] == (10, 10, 80, 60)
+        mock_image.autocrop.assert_called_once()
+
+    def test_add_center_guides_invokes_guides(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test add_center_guides calls vguide/hguide."""
+        from tachograph_wizard.core.image_cleanup import add_center_guides
+
+        mock_image = MagicMock()
+        mock_image.get_width.return_value = 100
+        mock_image.get_height.return_value = 50
+
+        add_center_guides(mock_image)
+
+        mock_image.add_vguide.assert_called_once_with(50)
+        mock_image.add_hguide.assert_called_once_with(25)
+
+
+class TestIslandDetectorModule:
+    """Test island_detector module fallback behavior."""
+
+    def test_remove_garbage_keep_largest_island_removes_layer_on_failure(
+        self,
+        mock_gimp_modules: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
+        """Test island_detector removes work layer when selection fails."""
+        from tachograph_wizard.core.island_detector import remove_garbage_keep_largest_island
+
+        _gimp_mock, _, _gegl_mock = mock_gimp_modules
+
+        mock_image = MagicMock()
+        mock_image.get_width.return_value = 10
+        mock_image.get_height.return_value = 10
+
+        mock_drawable = MagicMock()
+        mock_drawable.get_image.return_value = mock_image
+        mock_drawable.has_alpha.return_value = True
+        mock_drawable.copy.return_value = MagicMock()
+
+        def fake_run_pdb_procedure(
+            name: str,
+            _args: list[MagicMock],
+            *,
+            debug_log: MagicMock | None = None,
+        ) -> MagicMock:
+            _ = debug_log
+            if name == "gimp-image-select-color":
+                msg = "fail"
+                raise RuntimeError(msg)
+            if name == "gimp-image-select-contiguous-color":
+                msg = "fail"
+                raise RuntimeError(msg)
+            if name == "gimp-selection-is-empty":
+                result = MagicMock()
+
+                def side_effect(idx: int) -> bool | None:
+                    return True if idx == 1 else None
+
+                result.index.side_effect = side_effect
+                return result
+            return MagicMock()
+
+        with (
+            patch(
+                "tachograph_wizard.core.island_detector.run_pdb_procedure",
+                side_effect=fake_run_pdb_procedure,
+            ),
+            patch(
+                "tachograph_wizard.core.island_detector.buffer_get_bytes",
+                return_value=b"",
+            ),
+        ):
+            remove_garbage_keep_largest_island(mock_drawable, threshold=10.0)
+
+        mock_image.remove_layer.assert_called_once_with(mock_drawable.copy.return_value)
+
+
+class TestLoggingUtil:
+    """Test logging_util debug_log behavior."""
+
+    def test_debug_log_writes_log_line(self, tmp_path: Path) -> None:
+        """Test debug_log writes expected line to file."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        with patch.dict(os.environ, {"TEMP": str(tmp_path)}):
+            debug_log("hello", module="test_module")
+
+        log_path = tmp_path / "tachograph_wizard.log"
+        assert log_path.exists()
+        content = log_path.read_text(encoding="utf-8")
+        assert "test_module: hello" in content
+
+    def test_debug_log_no_env_returns(self, tmp_path: Path) -> None:
+        """Test debug_log returns without env variables."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        env_patch = {"TEMP": "", "TMP": "", "LOCALAPPDATA": ""}
+        with patch.dict(os.environ, env_patch, clear=True):
+            debug_log("hello", module="test_module")
+
+        assert not (tmp_path / "tachograph_wizard.log").exists()
+
+    def test_debug_log_appends(self, tmp_path: Path) -> None:
+        """Test debug_log appends to existing file."""
+        from tachograph_wizard.core.logging_util import debug_log
+
+        log_path = tmp_path / "tachograph_wizard.log"
+        log_path.write_text("seed\n", encoding="utf-8")
+
+        with patch.dict(os.environ, {"TEMP": str(tmp_path)}):
+            debug_log("next", module="test_module")
+
+        content = log_path.read_text(encoding="utf-8")
+        assert "seed" in content
+        assert "test_module: next" in content
+
+    def test_debug_log_handles_open_failure(self, tmp_path: Path) -> None:
+        """Test debug_log gracefully handles open failures."""
+        from tachograph_wizard.core import logging_util
+
+        with (
+            patch.dict(os.environ, {"TEMP": str(tmp_path)}),
+            patch.object(
+                logging_util.Path,
+                "open",
+                side_effect=OSError("fail"),
+            ),
+        ):
+            logging_util.debug_log("hello", module="test_module")
