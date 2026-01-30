@@ -24,7 +24,7 @@ jobs:
           pip install uv
 
       - name: Install project dependencies
-        run: uv sync
+        run: uv sync --all-groups
 
       - name: Verify toolchain
         run: |
