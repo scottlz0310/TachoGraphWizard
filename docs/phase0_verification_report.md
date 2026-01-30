@@ -86,7 +86,7 @@ basedpyright
    - プラグインの起動方法
    - トラブルシューティング
 
-3. **docs/phase2_implementation.md**
+3. **docs/Completed/phase2_implementation.md**
    - アーキテクチャ設計
    - データモデル定義
    - テンプレート構造
