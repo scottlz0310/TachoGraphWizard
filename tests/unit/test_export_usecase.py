@@ -68,7 +68,7 @@ class TestComputeOutputPath:
         """Test computing output path with sanitization."""
         from tachograph_wizard.core.export_usecase import ExportTemplateUseCase
 
-        output_dir = Path("/tmp/templates")  # noqa: S108
+        output_dir = Path("/tmp/templates")  # nosec B108
         template_name = "  my-template.json  "
 
         result = ExportTemplateUseCase.compute_output_path(template_name, output_dir)
@@ -79,7 +79,7 @@ class TestComputeOutputPath:
         """Test computing output path for name without extension."""
         from tachograph_wizard.core.export_usecase import ExportTemplateUseCase
 
-        output_dir = Path("/tmp/templates")  # noqa: S108
+        output_dir = Path("/tmp/templates")  # nosec B108
         template_name = "my-template"
 
         result = ExportTemplateUseCase.compute_output_path(template_name, output_dir)
