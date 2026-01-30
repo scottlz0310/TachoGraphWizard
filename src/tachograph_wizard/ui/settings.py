@@ -2,7 +2,7 @@
 
 統一されたsettingsアクセスを提供するクラス。
 内部的にsettings_managerの関数を使用しているが、
-オブジェクト指向のAPIを提供する。
+メソッドベースのオブジェクト指向なAPIを提供する。
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ class Settings:
     """TextInserterダイアログの設定を管理するクラス。
 
     内部的にsettings_managerの関数を呼び出すラッパー。
-    プロパティベースのAPIで、よりオブジェクト指向的なアクセスを提供。
+    メソッドベースのAPIで、よりオブジェクト指向的なアクセスを提供。
     """
 
     def load_last_used_date(self) -> datetime.date | None:
