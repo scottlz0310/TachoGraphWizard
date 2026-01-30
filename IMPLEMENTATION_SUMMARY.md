@@ -324,24 +324,29 @@ def remove_garbage_keep_largest_island(drawable: Gimp.Drawable, threshold: float
 - 470行削減（67%減）
 
 ### 4. テスト
-**ファイル**: `tests/unit/test_background_remover.py`
+**ファイル**:
+- `tests/unit/test_background_remover.py` (16 テストケース)
+- `tests/unit/test_image_cleanup.py` (9 テストケース) ★新規★
+- `tests/unit/test_island_detector.py` (7 テストケース) ★新規★
 
 **テストカバレッジ**:
 - BackgroundRemover の各メソッドが適切に委譲されることを検証
-- image_cleanup モジュールの基本動作を検証
-- island_detector のエラーハンドリングを検証
-- 18個のテストケースを含む
+- image_cleanup モジュールの基本動作を検証（despeckle, auto_cleanup_and_crop, add_center_guides）
+- island_detector のエラーハンドリングと複雑なアルゴリズムを検証
+- 合計 32 個のテストケース（16 + 9 + 7）
 
 ## テスト結果
 ```
-✅ 全テスト: 133個すべてパス
+✅ 全テスト: 149個すべてパス（+16 件の新規テスト）
 ✅ コードカバレッジ:
    - background_remover.py: 39%
-   - image_cleanup.py: 70%
-   - island_detector.py: 26%
+   - image_cleanup.py: 90% (新規テストで向上)
+   - island_detector.py: 72% (新規テストで向上)
+   - 全体: 32% (28% から向上)
 ✅ ruff format: パス
 ✅ ruff check: パス
 ✅ basedpyright: 0エラー
+```
 ```
 
 ## 変更統計
@@ -352,7 +357,9 @@ def remove_garbage_keep_largest_island(drawable: Gimp.Drawable, threshold: float
 | `core/island_detector.py` (新規) | +489 | - | +489 |
 | `core/background_remover.py` | +42 | -512 | -470 |
 | `tests/unit/test_background_remover.py` | +50 | - | +50 |
-| **合計** | **+793** | **-512** | **+281** |
+| `tests/unit/test_image_cleanup.py` (新規) | +243 | - | +243 |
+| `tests/unit/test_island_detector.py` (新規) | +264 | - | +264 |
+| **合計** | **+1300** | **-512** | **+788** |
 
 ## アーキテクチャの改善
 
