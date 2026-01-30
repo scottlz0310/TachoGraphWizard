@@ -463,7 +463,7 @@ def _debug_log(message: str) -> None:
 | 2026-01-29 | Phase 2 完了: image_analysis.py (264行), image_operations.py (265行) の作成 | PR #40 |
 | 2026-01-29 | Phase 2 検証: 全テスト (103件) パス、コード品質チェック完了 | PR #40 |
 | 2026-01-30 | Phase 3 着手: image_cleanup.py / island_detector.py へ背景除去ロジックを分割 | - |
-| 2026-01-30 | Phase 3 完了: background_remover.py (702行→232行), 全テスト (133件) パス | - |
+| 2026-01-30 | Phase 3 完了: background_remover.py (702行→232行), 全テスト (149件) パス | - |
 
 ### 11.3 Phase 1 完了サマリー
 

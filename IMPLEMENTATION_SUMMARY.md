@@ -357,9 +357,9 @@ def remove_garbage_keep_largest_island(drawable: Gimp.Drawable, threshold: float
 | `core/island_detector.py` (新規) | +489 | - | +489 |
 | `core/background_remover.py` | +42 | -512 | -470 |
 | `tests/unit/test_background_remover.py` | +50 | - | +50 |
-| `tests/unit/test_image_cleanup.py` (新規) | +243 | - | +243 |
-| `tests/unit/test_island_detector.py` (新規) | +264 | - | +264 |
-| **合計** | **+1300** | **-512** | **+788** |
+| `tests/unit/test_image_cleanup.py` (新規) | +221 | - | +221 |
+| `tests/unit/test_island_detector.py` (新規) | +265 | - | +265 |
+| **合計** | **+1279** | **-512** | **+767** |
 
 ## アーキテクチャの改善
 
