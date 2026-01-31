@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -314,7 +315,8 @@ class TextInserterDialog(GimpUi.Dialog):
             self._show_error("Please select a CSV file")
             return
 
-        try:
+        # Action execution with error handling
+        def load_csv_action() -> None:
             csv_path = Path(csv_path_str)
             self.csv_data = TextInsertUseCase.load_csv(csv_path)
             self.last_csv_path = csv_path
@@ -333,8 +335,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
             self.status_label.set_text(f"Loaded {row_count} rows from CSV")
 
-        except (FileNotFoundError, ValueError) as e:
-            self._show_error(f"Failed to load CSV: {e}")
+        self._run_action("load CSV", load_csv_action)
 
     def _on_row_changed(self, spinner: Gtk.SpinButton) -> None:
         """Handle row spinner value change."""
@@ -363,27 +364,18 @@ class TextInserterDialog(GimpUi.Dialog):
 
     def _on_insert_clicked(self, button: Gtk.Button) -> None:
         """Handle insert button click."""
-        if not self.csv_data:
-            self._show_error("Please load a CSV file first")
+        # Guard clauses
+        if not self._require_csv_loaded():
             return
-
-        if self.current_row_index >= len(self.csv_data):
-            self._show_error("Invalid row selected")
+        if not self._require_valid_row():
             return
+        success, _template_name, template_path = self._require_template_selected()
+        if not success:
+            return
+        assert template_path is not None  # Type narrowing: success=True guarantees non-None
 
-        try:
-            # Get selected template
-            template_name = self.template_combo.get_active_text()
-
-            if not template_name:
-                self._show_error("Please select a template")
-                return
-
-            template_path = self.template_paths.get(template_name)
-            if template_path is None:
-                self._show_error("Selected template not found")
-                return
-
+        # Action execution with error handling
+        def insert_action() -> None:
             # Insert text using UseCase
             layers = TextInsertUseCase.insert_text_from_csv(
                 self.image,
@@ -402,9 +394,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self.settings.save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Inserted {len(layers)} text layers")
 
-        except Exception as e:
-            _debug_log(f"ERROR: Insert failed: {e}")
-            self._show_error(f"Failed to insert text: {e}")
+        self._run_action("insert text", insert_action)
 
     def _on_filename_field_toggled(self, check: Gtk.CheckButton) -> None:
         """Handle filename field checkbox toggle."""
@@ -445,21 +435,18 @@ class TextInserterDialog(GimpUi.Dialog):
 
     def _on_save_clicked(self, button: Gtk.Button) -> None:
         """Handle save button click."""
-        if not self.csv_data:
-            self._show_error("Please load a CSV file first")
+        # Guard clauses
+        if not self._require_csv_loaded():
             return
-
-        if self.current_row_index >= len(self.csv_data):
-            self._show_error("Invalid row selected")
+        if not self._require_valid_row():
             return
-
-        folder_path_str = self.output_folder_button.get_filename()
-        if not folder_path_str:
-            self._show_error("Please select an output folder")
+        success, output_folder = self._require_output_folder()
+        if not success:
             return
+        assert output_folder is not None  # Type narrowing: success=True guarantees non-None
 
-        try:
-            output_folder = Path(folder_path_str)
+        # Action execution with error handling
+        def save_action() -> None:
             selected_fields = self._get_selected_filename_fields()
 
             # Save image using UseCase
@@ -474,9 +461,7 @@ class TextInserterDialog(GimpUi.Dialog):
             self.settings.save_last_used_date(self._get_selected_date())
             self.status_label.set_text(f"Saved: {output_path}")
 
-        except Exception as e:
-            _debug_log(f"ERROR: Save failed: {e}")
-            self._show_error(f"Failed to save image: {e}")
+        self._run_action("save image", save_action)
 
     def _on_configure_event(self, widget: Gtk.Widget, event: object) -> bool:
         """Save window size when it changes (with debouncing).
@@ -513,6 +498,74 @@ class TextInserterDialog(GimpUi.Dialog):
         self.settings.save_window_size(width, height)
         self._resize_save_timeout_id = None
         return False  # Return False to stop the timeout from repeating
+
+    def _require_csv_loaded(self) -> bool:
+        """Guard: Ensure CSV data is loaded.
+
+        Returns:
+            True if CSV is loaded, False otherwise (shows error).
+        """
+        if not self.csv_data:
+            self._show_error("Please load a CSV file first")
+            return False
+        return True
+
+    def _require_valid_row(self) -> bool:
+        """Guard: Ensure a valid row is selected.
+
+        Returns:
+            True if a valid row is selected, False otherwise (shows error).
+        """
+        if self.current_row_index >= len(self.csv_data):
+            self._show_error("Invalid row selected")
+            return False
+        return True
+
+    def _require_template_selected(self) -> tuple[bool, str, Path] | tuple[bool, None, None]:
+        """Guard: Ensure a template is selected.
+
+        Returns:
+            Tuple of (True, template_name, template_path) on success,
+            or (False, None, None) on failure (shows error).
+        """
+        template_name = self.template_combo.get_active_text()
+        if not template_name:
+            self._show_error("Please select a template")
+            return False, None, None
+
+        template_path = self.template_paths.get(template_name)
+        if template_path is None:
+            self._show_error("Selected template not found")
+            return False, None, None
+
+        return True, template_name, template_path
+
+    def _require_output_folder(self) -> tuple[bool, Path] | tuple[bool, None]:
+        """Guard: Ensure output folder is selected.
+
+        Returns:
+            Tuple of (True, output_folder) on success,
+            or (False, None) on failure (shows error).
+        """
+        folder_path_str = self.output_folder_button.get_filename()
+        if not folder_path_str:
+            self._show_error("Please select an output folder")
+            return False, None
+
+        return True, Path(folder_path_str)
+
+    def _run_action(self, action_name: str, action_func: Callable[[], None]) -> None:
+        """Execute an action with consistent error handling.
+
+        Args:
+            action_name: Name of the action for error messages.
+            action_func: Function to execute (must not take arguments).
+        """
+        try:
+            action_func()
+        except Exception as e:
+            _debug_log(f"ERROR: {action_name} failed: {e}")
+            self._show_error(f"Failed to {action_name}: {e}")
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.
