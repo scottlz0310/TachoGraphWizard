@@ -26,35 +26,36 @@
 ---
 
 ## Phase 0: 現状固定（準備）
-- [ ] 既存の手動動作確認（CSV→挿入→保存）
-- [ ] 既存の自動テストが全てパス
+- [x] 既存の手動動作確認（CSV→挿入→保存）
+- [x] 既存の自動テストが全てパス
 
 ## Phase 1: UseCase層の導入（移動のみ）
-- [ ] core/text_insert_usecase.py を新規作成
-- [ ] core/export_usecase.py を新規作成
-- [ ] TextInserterDialog からロジックをUseCaseへ移動
-- [ ] UseCaseユニットテストを追加
-- [ ] 差分は「移動のみ」で、動作変更は行わない
+- [x] core/text_insert_usecase.py を新規作成
+- [x] core/export_usecase.py を新規作成
+- [x] TextInserterDialog からロジックをUseCaseへ移動
+- [x] UseCaseユニットテストを追加
+- [x] 差分は「移動のみ」で、動作変更は行わない
 
 ## Phase 2: Settingsオブジェクト導入（配線のみ）
-- [ ] ui/settings.py を新規作成（Settingsオブジェクト）
-- [ ] TextInserterDialogのsettingsアクセスをSettings経由に統一
-- [ ] settings_managerの互換ラッパ維持
-- [ ] 差分は「配線のみ」で、動作変更は行わない
+- [x] ui/settings.py を新規作成（Settingsオブジェクト）
+- [x] TextInserterDialogのsettingsアクセスをSettings経由に統一
+- [x] settings_managerの互換ラッパ維持
+- [x] 差分は「配線のみ」で、動作変更は行わない
 
 ## Phase 3: UIの .ui 化（移動のみ）
-- [ ] ui/text_inserter_dialog.ui を新規作成
-- [ ] TextInserterDialog をGtk.Builderロード方式へ移行
-- [ ] UIロード健全性テストを追加
-- [ ] 必須IDリストを固定（template_dir_button / template_combo / csv_chooser / date_calendar / row_spinner / preview_text / output_folder_button / filename_preview_label / status_label）
-- [ ] 差分は「移動のみ」で、動作変更は行わない
+- [x] ui/text_inserter_dialog.ui を新規作成
+- [x] TextInserterDialog をGtk.Builderロード方式へ移行
+- [x] UIロード健全性テストを追加
+- [x] 必須IDリストを固定（template_dir_button / template_combo / csv_chooser / date_calendar / row_spinner / preview_text / output_folder_button / filename_preview_label / status_label）
+- [x] 差分は「移動のみ」で、動作変更は行わない
 
 ## Phase 4: ガード節/エラーハンドリング共通化（整理のみ）
-- [ ] _require_* 系のプリチェック共通化
-- [ ] _run_action による例外処理集約
-- [ ] 既存UI機能を維持していることを確認
-- [ ] 差分は「整理のみ」で、動作変更は行わない
+- [x] _require_* 系のプリチェック共通化
+- [x] _run_action による例外処理集約
+- [x] 既存UI機能を維持していることを確認
+- [x] 差分は「整理のみ」で、動作変更は行わない
 
 ## 仕上げ
-- [ ] docs/text_inserter_refactoring_plan.md と整合確認
-- [ ] 全テスト実行（ruff/basedpyright/pytest）
+- [x] docs/text_inserter_refactoring_plan.md と整合確認
+- [x] 全テスト実行（ruff/basedpyright/pytest）
+- [x] リファクタリング前後の行数を比較
