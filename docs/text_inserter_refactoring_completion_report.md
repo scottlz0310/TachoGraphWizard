@@ -41,7 +41,7 @@ TextInserter プラグインのリファクタリング計画（`docs/text_inser
 
 ### 新規作成ファイル
 
-#### 1. `core/text_insert_usecase.py` (232行)
+#### 1. `core/text_insert_usecase.py` (233行)
 **責務**: テキスト挿入に関するビジネスロジック
 
 **実装クラス**:
@@ -56,7 +56,7 @@ TextInserter プラグインのリファクタリング計画（`docs/text_inser
 - `insert_text_from_csv()`: CSVデータからテキストレイヤーを挿入
 - `save_image_with_metadata()`: 画像をメタデータ付きで保存
 
-#### 2. `core/export_usecase.py` (74行)
+#### 2. `core/export_usecase.py` (75行)
 **責務**: テンプレートエクスポートのビジネスロジック
 
 **実装クラス**:
@@ -90,7 +90,7 @@ TextInserter プラグインのリファクタリング計画（`docs/text_inser
 
 ### 新規作成ファイル
 
-#### `ui/settings.py` (121行)
+#### `ui/settings.py` (122行)
 **責務**: 設定の読み込み・保存を統一的に管理
 
 **実装クラス**:
@@ -220,17 +220,17 @@ uv run pytest tests/
 - text_inserter_dialog.py: 606行
 
 **リファクタリング後（現在のブランチ）**:
-- text_inserter_dialog.py: 606行（責務は大幅に削減）
-- text_insert_usecase.py: 232行（新規）
-- export_usecase.py: 74行（新規）
-- settings.py: 121行（新規）
-- **合計**: 1,033行（+427行）
+- text_inserter_dialog.py: 607行（責務は大幅に削減）
+- text_insert_usecase.py: 233行（新規）
+- export_usecase.py: 75行（新規）
+- settings.py: 122行（新規）
+- **合計**: 1,037行（+431行）
 
 **分析**:
-- UI層（text_inserter_dialog.py）の行数は同じだが、**責務密度が大幅に低下**
-- ビジネスロジックが UseCase 層（232行）に分離
-- 設定管理が Settings 層（121行）に分離
-- テンプレートエクスポートロジックが UseCase 層（74行）に分離
+- UI層（text_inserter_dialog.py）の行数はわずかに増加（+1行）したが、**責務密度が大幅に低下**
+- ビジネスロジックが UseCase 層（233行）に分離
+- 設定管理が Settings 層（122行）に分離
+- テンプレートエクスポートロジックが UseCase 層（75行）に分離
 - 結果: **UI層の責務密度が大幅に低下し、テスト容易性が向上**
 
 ---
@@ -274,12 +274,12 @@ ui/text_inserter_dialog.py (606行)
 
 ### リファクタリング後
 ```
-ui/text_inserter_dialog.py (606行)
+ui/text_inserter_dialog.py (607行)
   ├─→ ui/text_inserter_dialog.ui (34KB) ★新規★
   │     └─ [UI定義]
-  ├─→ ui/settings.py (121行) ★新規★
+  ├─→ ui/settings.py (122行) ★新規★
   │     └─ [設定管理]
-  └─→ core/text_insert_usecase.py (232行) ★新規★
+  └─→ core/text_insert_usecase.py (233行) ★新規★
         └─ [ビジネスロジック]
 ```
 
@@ -327,9 +327,9 @@ ui/text_inserter_dialog.py (606行)
 
 | ファイル | 行数 | 責務 | テストファイル |
 |---------|------|------|---------------|
-| `core/text_insert_usecase.py` | 232 | ビジネスロジック（テキスト挿入） | `test_text_insert_usecase.py` (426行) |
-| `core/export_usecase.py` | 74 | ビジネスロジック（エクスポート） | `test_export_usecase.py` (237行) |
-| `ui/settings.py` | 121 | 設定管理 | `test_settings.py` (325行) |
+| `core/text_insert_usecase.py` | 233 | ビジネスロジック（テキスト挿入） | `test_text_insert_usecase.py` (426行) |
+| `core/export_usecase.py` | 75 | ビジネスロジック（エクスポート） | `test_export_usecase.py` (237行) |
+| `ui/settings.py` | 122 | 設定管理 | `test_settings.py` (325行) |
 | `ui/text_inserter_dialog.ui` | 34KB | UI定義 | `test_text_inserter_dialog.py` で健全性テスト |
 
 ---
