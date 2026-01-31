@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -371,13 +372,14 @@ class TextInserterDialog(GimpUi.Dialog):
         success, _template_name, template_path = self._require_template_selected()
         if not success:
             return
+        assert template_path is not None  # Type narrowing: success=True guarantees non-None
 
         # Action execution with error handling
         def insert_action() -> None:
             # Insert text using UseCase
             layers = TextInsertUseCase.insert_text_from_csv(
                 self.image,
-                template_path,  # type: ignore[arg-type]
+                template_path,
                 self.csv_data[self.current_row_index],
                 self._get_selected_date(),
             )
@@ -441,6 +443,7 @@ class TextInserterDialog(GimpUi.Dialog):
         success, output_folder = self._require_output_folder()
         if not success:
             return
+        assert output_folder is not None  # Type narrowing: success=True guarantees non-None
 
         # Action execution with error handling
         def save_action() -> None:
@@ -449,7 +452,7 @@ class TextInserterDialog(GimpUi.Dialog):
             # Save image using UseCase
             output_path = TextInsertUseCase.save_image_with_metadata(
                 self.image,
-                output_folder,  # type: ignore[arg-type]
+                output_folder,
                 self.csv_data[self.current_row_index],
                 self._get_selected_date(),
                 selected_fields,
@@ -518,12 +521,12 @@ class TextInserterDialog(GimpUi.Dialog):
             return False
         return True
 
-    def _require_template_selected(self) -> tuple[bool, str | None, Path | None]:
+    def _require_template_selected(self) -> tuple[bool, str, Path] | tuple[bool, None, None]:
         """Guard: Ensure a template is selected.
 
         Returns:
-            Tuple of (success, template_name, template_path).
-            If success is False, shows error and template_name/path are None.
+            Tuple of (True, template_name, template_path) on success,
+            or (False, None, None) on failure (shows error).
         """
         template_name = self.template_combo.get_active_text()
         if not template_name:
@@ -537,12 +540,12 @@ class TextInserterDialog(GimpUi.Dialog):
 
         return True, template_name, template_path
 
-    def _require_output_folder(self) -> tuple[bool, Path | None]:
+    def _require_output_folder(self) -> tuple[bool, Path] | tuple[bool, None]:
         """Guard: Ensure output folder is selected.
 
         Returns:
-            Tuple of (success, output_folder).
-            If success is False, shows error and output_folder is None.
+            Tuple of (True, output_folder) on success,
+            or (False, None) on failure (shows error).
         """
         folder_path_str = self.output_folder_button.get_filename()
         if not folder_path_str:
@@ -551,7 +554,7 @@ class TextInserterDialog(GimpUi.Dialog):
 
         return True, Path(folder_path_str)
 
-    def _run_action(self, action_name: str, action_func: callable) -> None:  # type: ignore[valid-type]
+    def _run_action(self, action_name: str, action_func: Callable[[], None]) -> None:
         """Execute an action with consistent error handling.
 
         Args:
@@ -562,7 +565,7 @@ class TextInserterDialog(GimpUi.Dialog):
             action_func()
         except Exception as e:
             _debug_log(f"ERROR: {action_name} failed: {e}")
-            self._show_error(f"Failed to {action_name.lower()}: {e}")
+            self._show_error(f"Failed to {action_name}: {e}")
 
     def _show_error(self, message: str) -> None:
         """Show error message dialog.
