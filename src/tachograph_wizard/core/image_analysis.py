@@ -88,7 +88,7 @@ def get_image_dpi(image: Gimp.Image) -> float | None:
             dpi = y_res if y_res > 0 else x_res
             if 50.0 <= dpi <= 1200.0:
                 return dpi
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return None
