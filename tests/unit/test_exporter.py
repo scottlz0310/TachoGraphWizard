@@ -132,7 +132,7 @@ class TestExporter:
         # Execute
         try:
             Exporter.save_png(mock_image, output_path)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             # May fail due to incomplete mocking, but directory should be created
             pass
 
