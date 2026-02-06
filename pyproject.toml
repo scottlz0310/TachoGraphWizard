@@ -23,7 +23,7 @@ packages = ["src/tachograph_wizard"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
