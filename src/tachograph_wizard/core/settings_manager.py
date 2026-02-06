@@ -41,7 +41,7 @@ def _load_setting(key: str) -> str | None:
         return data.get(key)
     except FileNotFoundError:
         return None
-    except (json.JSONDecodeError, TypeError, ValueError):
+    except json.JSONDecodeError, TypeError, ValueError:
         # Log warning if we had a debug logger
         pass
     return None
@@ -62,7 +62,7 @@ def _save_setting(key: str, value: str) -> None:
             try:
                 with settings_path.open("r", encoding="utf-8") as handle:
                     data = json.load(handle)
-            except (json.JSONDecodeError, TypeError, ValueError):
+            except json.JSONDecodeError, TypeError, ValueError:
                 data = {}
         data[key] = value
         with settings_path.open("w", encoding="utf-8") as handle:
@@ -116,7 +116,7 @@ def load_last_used_date() -> datetime.date | None:
     if value:
         try:
             return datetime.date.fromisoformat(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
     return None
 
@@ -227,7 +227,7 @@ def load_window_size() -> tuple[int, int]:
         w = int(width) if width else 500
         h = int(height) if height else 600
         return (w, h)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return (500, 600)
 
 
