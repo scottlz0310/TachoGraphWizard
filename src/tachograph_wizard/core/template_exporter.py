@@ -418,8 +418,8 @@ class TemplateExporter:
                 dpi = y_res if y_res > 0 else x_res
                 if dpi > 0:
                     return dpi
-            except TypeError, ValueError:
-                pass
+            except (TypeError, ValueError) as exc:
+                _debug_log(f"Failed to parse image resolution {resolution!r}: {exc}")
 
         return 72.0
 
