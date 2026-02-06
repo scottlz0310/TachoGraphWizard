@@ -418,7 +418,7 @@ class TemplateExporter:
                 dpi = y_res if y_res > 0 else x_res
                 if dpi > 0:
                     return dpi
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
 
         return 72.0

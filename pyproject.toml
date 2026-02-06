@@ -23,7 +23,7 @@ packages = ["src/tachograph_wizard"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py314"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
@@ -144,7 +144,7 @@ exclude_lines = [
 ]
 
 [tool.basedpyright]
-pythonVersion = "3.14"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 # Disable checks that don't work with GObject Introspection (GIMP/GTK APIs)
 reportMissingImports = false
