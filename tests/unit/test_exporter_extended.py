@@ -7,6 +7,8 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestExporterSavePng:
     """Test Exporter.save_png integration paths."""
@@ -254,6 +256,3 @@ class TestExporterSaveWithNamingConvention:
                 tmp_path,
                 date=date(2025, 3, 15),
             )
-
-
-import pytest

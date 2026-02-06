@@ -328,7 +328,7 @@ class TestSettingsManagerGetSettingsPath:
             patch("tachograph_wizard.core.settings_manager.os.name", "posix"),
             patch.dict(
                 "os.environ",
-                {"XDG_CONFIG_HOME": "/tmp/test_config"},  # noqa: S108
+                {"XDG_CONFIG_HOME": "/tmp/test_config"},  # noqa: S108  # nosec B108
                 clear=False,
             ),
         ):
