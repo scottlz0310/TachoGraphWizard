@@ -11,11 +11,6 @@
     {
       "matchPackageNames": ["python"],
       "enabled": false
-    },
-    {
-      "matchPackageNames": ["python"],
-      "matchUpdateTypes": ["major", "minor"],
-      "enabled": false
     }
   ],
   "constraints": {
