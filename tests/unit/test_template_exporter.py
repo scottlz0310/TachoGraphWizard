@@ -53,7 +53,6 @@ class TestTemplateExporterHelpers:
         from tachograph_wizard.core.template_exporter import _extract_result_values
 
         result = MagicMock()
-        result.index.side_effect = lambda i: [10, 20, 30][i] if i < 3 else (_ for _ in ()).throw(IndexError)  # type: ignore[arg-type]
 
         def side_effect(i: int) -> int:
             if i < 3:
