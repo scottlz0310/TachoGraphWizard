@@ -48,15 +48,38 @@ A3スキャン画像に含まれる複数のタコグラフチャート（円盤
 uv sync
 ```
 
-2. **プラグインのインストール**
-GIMP 3のプラグインディレクトリにシンボリックリンクまたはコピーを作成します。
+2. **プラグインのインストール（対話式）**
+`copy`（Windowsは`xcopy`）と`symlink`を選択できます。
 
-**Windows**:
 ```bash
-# GIMPのプラグインディレクトリを確認
-# 通常: C:\Users\<ユーザー名>\AppData\Roaming\GIMP\3.0\plug-ins\
+# 推奨: OS共通で対話式インストーラーを起動
+uv run python scripts/install_plugin.py
+```
 
-# プラグインディレクトリにコピー
+**OS別ラッパースクリプト**
+```powershell
+# Windows (PowerShell)
+.\scripts\install_plugin.ps1
+```
+
+```bash
+# Linux / macOS
+bash ./scripts/install_plugin.sh
+```
+
+> Windowsで`symlink`を選んだとき権限不足の場合は、管理者PowerShellに昇格して再実行する確認が表示されます。
+
+**非対話モード例**
+```bash
+# copyで上書き実行
+uv run python scripts/install_plugin.py --mode copy --non-interactive --yes
+
+# symlinkで上書き実行
+uv run python scripts/install_plugin.py --mode symlink --non-interactive --yes
+```
+
+**手動コピー（従来）**
+```powershell
 xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GIMP\3.0\plug-ins\tachograph_wizard"
 ```
 

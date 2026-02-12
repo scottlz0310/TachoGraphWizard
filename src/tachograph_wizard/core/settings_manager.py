@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import platform
 from pathlib import Path
 
 
@@ -18,7 +19,7 @@ def _get_settings_path() -> Path:
     Returns:
         Path to the settings.json file in the user's config directory.
     """
-    if os.name == "nt":
+    if platform.system() == "Windows":
         base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
     else:
         base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")

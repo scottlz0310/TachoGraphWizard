@@ -325,7 +325,7 @@ class TestSettingsManagerGetSettingsPath:
         from tachograph_wizard.core.settings_manager import _get_settings_path
 
         with (
-            patch("tachograph_wizard.core.settings_manager.os.name", "posix"),
+            patch("tachograph_wizard.core.settings_manager.platform.system", return_value="Linux"),
             patch.dict(
                 "os.environ",
                 {"XDG_CONFIG_HOME": "/tmp/test_config"},  # noqa: S108  # nosec B108

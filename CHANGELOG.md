@@ -8,6 +8,9 @@
 - **ファイル名フィールド選択の永続化**: Text Inserterのファイル名に含めるフィールドの選択状態を保存
 - **ウィンドウサイズの永続化**: Text Inserterのウィンドウサイズを保存し、次回起動時に復元
 - **キャンセルボタン対応**: Text Inserterダイアログでキャンセル時に挿入したレイヤーを削除する機能を追加
+- **対話式インストーラー追加**: `scripts/install_plugin.py` を追加し、`copy`（Windowsはxcopy）/`symlink`を選択可能に
+- **OS別ラッパースクリプト追加**: `scripts/install_plugin.ps1` と `scripts/install_plugin.sh` を追加
+- **Windows昇格対応**: symlink作成時に権限不足なら管理者PowerShellで再実行できるよう改善
 
 ### 修正
 - **型チェックエラーの解消**: basedpyright設定にGObject Introspection向けの例外を追加（`reportAttributeAccessIssue`、`reportUnnecessaryComparison`）
