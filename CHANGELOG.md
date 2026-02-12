@@ -3,6 +3,8 @@
 このドキュメントは現行仕様の要約と変更履歴を記載します。
 
 ## [Unreleased]
+### 変更
+- **pre-commitのCI同等化**: `ruff format --check` / `ruff check` / `basedpyright` / `pytest` / `bandit` をpre-commitで実行するよう更新
 
 ## [1.2.0] - 2026-02-12
 ### 追加
