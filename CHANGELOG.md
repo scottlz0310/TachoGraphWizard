@@ -5,6 +5,7 @@
 ## [Unreleased]
 ### 変更
 - **pre-commitのCI同等化**: `ruff format --check` / `ruff check` / `basedpyright` / `pytest` / `bandit` をpre-commitで実行するよう更新
+- **Threshold Bias初期値の見直し**: Chart WizardのSplit Imagesでしきい値スライダー初期値を15に変更し、UI表記を実際のデフォルト挙動に合わせて明確化
 
 ## [1.2.0] - 2026-02-12
 ### 追加

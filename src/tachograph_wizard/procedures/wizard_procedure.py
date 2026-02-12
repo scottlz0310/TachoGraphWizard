@@ -15,6 +15,16 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gimp, GimpUi, Gtk
 
+_DEFAULT_AUTO_THRESHOLD_BIAS = 15
+
+
+def _resolve_auto_threshold_bias(threshold_value: int) -> int | None:
+    """Resolve UI threshold value to splitter threshold bias.
+
+    The UI default should defer to ImageSplitter's internal default behavior.
+    """
+    return None if threshold_value == _DEFAULT_AUTO_THRESHOLD_BIAS else threshold_value
+
 
 def run_wizard_dialog(
     image: Gimp.Image,
@@ -149,13 +159,13 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
         # Threshold bias
         auto_threshold_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        auto_threshold_label = Gtk.Label(label="Threshold Bias (0=Auto):")
+        auto_threshold_label = Gtk.Label(label=f"Threshold Bias (Default={_DEFAULT_AUTO_THRESHOLD_BIAS}):")
         auto_threshold_label.set_xalign(0.0)
         auto_threshold_box.pack_start(auto_threshold_label, False, False, 0)
 
         self.auto_threshold_adjustment = Gtk.Adjustment(
-            value=0,
-            lower=0,
+            value=_DEFAULT_AUTO_THRESHOLD_BIAS,
+            lower=1,
             upper=255,
             step_increment=1,
             page_increment=10,
@@ -252,7 +262,7 @@ class TachographSimpleDialog(GimpUi.Dialog):
 
             split_padding = int(self.split_padding_adjustment.get_value())
             threshold_value = int(self.auto_threshold_adjustment.get_value())
-            threshold_bias = threshold_value if threshold_value > 0 else None
+            threshold_bias = _resolve_auto_threshold_bias(threshold_value)
             edge_trim_left = int(self.auto_edge_trim_left.get_value())
             edge_trim_right = int(self.auto_edge_trim_right.get_value())
             edge_trim_top = int(self.auto_edge_trim_top.get_value())

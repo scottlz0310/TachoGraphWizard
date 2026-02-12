@@ -116,7 +116,7 @@ xcopy /E /I src\tachograph_wizard "C:\Users\<ユーザー名>\AppData\Roaming\GI
    - **Split Padding (px)**: 各円盤周囲の余白を設定（デフォルト20px）
      - 値を大きくすると余白が増える
      - 原稿の歪みや位置ズレがある場合は調整
-   - **Threshold Bias (0=Auto)**: しきい値バイアス（通常は0=自動でOK）
+   - **Threshold Bias (Default=15)**: しきい値バイアス（通常は15のままでOK）
    - **Edge Trim (px)**: スキャン画像の端から切り取るピクセル数（必要に応じて設定）
    - **Split Images**ボタンをクリックして分割実行
    - 分割された各円盤画像が新しいウィンドウで表示される
