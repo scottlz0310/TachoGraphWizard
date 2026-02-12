@@ -235,7 +235,9 @@ class TestLoadCsv:
         csv_file = tmp_path / "test.csv"
         csv_file.write_text("vehicle_no,driver\nAB-1234,John\nCD-5678,Jane\n", encoding="utf-8")
 
-        data = TextInsertUseCase.load_csv(csv_file)
+        # 実環境の settings.json を汚染しないため保存処理をモックする
+        with patch("tachograph_wizard.core.text_insert_usecase.save_csv_path"):
+            data = TextInsertUseCase.load_csv(csv_file)
 
         assert len(data) == 2
         assert data[0]["vehicle_no"] == "AB-1234"
