@@ -182,7 +182,7 @@ jobs:
               body: comment
             });
 
-  dependency-review:
+  pip-audit:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
@@ -197,10 +197,50 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --all-extras || uv sync
+        run: uv sync --all-groups || uv sync
 
       - name: Audit dependencies for vulnerabilities
         run: uv run --with pip-audit pip-audit
+
+      - name: Check dependency licenses against denylist
+        run: |
+          uv run --with pip-licenses pip-licenses --format=json > /tmp/licenses.json
+          uv run python - << 'EOF'
+          import json
+          import sys
+
+          DENIED_LICENSES = {
+              "GPL-1.0", "GPL-1.0+", "GPL-1.0-only", "GPL-1.0-or-later",
+              "GPL-2.0", "GPL-2.0+", "GPL-2.0-only", "GPL-2.0-or-later",
+              "LGPL-2.0", "LGPL-2.0+", "LGPL-2.0-only", "LGPL-2.0-or-later",
+              "LGPL-2.1", "LGPL-2.1+", "LGPL-2.1-only", "LGPL-2.1-or-later",
+              "GNU General Public License v2",
+              "GNU General Public License v2 (GPLv2)",
+              "GNU Lesser General Public License v2",
+              "GNU Lesser General Public License v2 (LGPLv2)",
+              "GNU Lesser General Public License v2.1",
+          }
+
+          with open("/tmp/licenses.json") as f:
+              packages = json.load(f)
+
+          disallowed = []
+          for pkg in packages:
+              license_name = (pkg.get("License") or "").strip()
+              raw_parts = license_name.replace(" OR ", ",").replace(";", ",").split(",")
+              parts = {p.strip() for p in raw_parts if p.strip()}
+              for part in parts:
+                  if part in DENIED_LICENSES:
+                      disallowed.append(f"{pkg['Name']} ({part})")
+
+          if disallowed:
+              sys.stderr.write(
+                  "Denied licenses detected:\n  " + "\n  ".join(disallowed) + "\n"
+              )
+              sys.exit(1)
+
+          print("No denied licenses found in dependencies.")
+          EOF
 
   codeql:
     name: CodeQL Analysis
