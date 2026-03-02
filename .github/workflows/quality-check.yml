@@ -218,44 +218,9 @@ jobs:
         run: uv sync --all-groups || uv sync
 
       - name: Audit dependencies for vulnerabilities
-        run: uv run --with pip-audit pip-audit
+        run: uv run --with pip-audit==2.10.0 pip-audit
 
       - name: Check dependency licenses against allowlist
         run: |
-          uv run --with pip-licenses pip-licenses --format=json > /tmp/licenses.json
-          uv run python - << 'EOF'
-          import json
-          import sys
-
-          ALLOWED_LICENSES = {
-              "MIT", "MIT License",
-              "Apache-2.0", "Apache Software License",
-              "BSD-2-Clause", "BSD-3-Clause",
-              "BSD License",
-              "ISC", "ISC License (ISCL)",
-              "GPL-3.0", "GNU General Public License v3 (GPLv3)",
-              "Unlicense",
-              "Python Software Foundation License",
-              "Public Domain",
-          }
-
-          with open("/tmp/licenses.json") as f:
-              packages = json.load(f)
-
-          unapproved = []
-          for pkg in packages:
-              license_name = (pkg.get("License") or "UNKNOWN").strip()
-              raw_parts = license_name.replace(" OR ", ",").replace(";", ",").split(",")
-              parts = {p.strip() for p in raw_parts if p.strip()}
-              for part in parts:
-                  if part not in ALLOWED_LICENSES:
-                      unapproved.append(f"{pkg['Name']} ({part})")
-
-          if unapproved:
-              sys.stderr.write(
-                  "Disallowed licenses detected:\n  " + "\n  ".join(unapproved) + "\n"
-              )
-              sys.exit(1)
-
-          print("All dependency licenses are within the allowlist.")
-          EOF
+          uv run --with pip-licenses==5.5.1 pip-licenses --format=json > /tmp/licenses.json
+          uv run python .github/scripts/check_licenses.py --mode allowlist
