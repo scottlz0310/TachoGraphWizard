@@ -74,7 +74,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--licenses-file",
-        default="/tmp/licenses.json",  # noqa: S108
+        default="/tmp/licenses.json",  # noqa: S108  # nosec B108
         help="pip-licenses --format=json の出力ファイルパス",
     )
     args = parser.parse_args()
