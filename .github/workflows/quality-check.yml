@@ -218,7 +218,12 @@ jobs:
         run: uv sync --all-groups || uv sync
 
       - name: Audit dependencies for vulnerabilities
-        run: uv run --with pip-audit==2.10.0 pip-audit
+        run: |
+          # CVE-2026-4539: ReDoS in pygments AdlLexer (pygments 2.19.x)
+          # No fix version available yet. Risk is minimal: pygments is an indirect
+          # dev dependency (via rich/bandit/basedpyright) and AdlLexer is never
+          # invoked in this project. Remove once a patched pygments is released.
+          uv run --with pip-audit==2.10.0 pip-audit --ignore-vuln CVE-2026-4539
 
       - name: Check dependency licenses against allowlist
         run: |
