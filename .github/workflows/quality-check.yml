@@ -223,7 +223,11 @@ jobs:
           # No fix version available yet. Risk is minimal: pygments is an indirect
           # dev dependency (via rich/bandit/basedpyright) and AdlLexer is never
           # invoked in this project. Remove once a patched pygments is released.
-          uv run --with pip-audit==2.10.0 pip-audit --ignore-vuln CVE-2026-4539
+          #
+          # CVE-2026-3219: Vulnerability in pip itself (runner-installed toolchain).
+          # pip is not a direct project dependency; we do not control the runner's pip
+          # version. No fix version is available yet. Remove once pip is patched.
+          uv run --with pip-audit==2.10.0 pip-audit --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219
 
       - name: Check dependency licenses against allowlist
         run: |
