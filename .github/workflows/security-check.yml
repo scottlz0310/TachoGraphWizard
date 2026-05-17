@@ -60,17 +60,24 @@ jobs:
             uv venv
             source .venv/bin/activate
           fi
-          uv pip install bandit[toml] safety
+          uv pip install bandit[toml]
 
       - name: Run Bandit security linter
         run: |
           uv run bandit -c pyproject.toml -r . -f json -o bandit-report.json || true
           uv run bandit -c pyproject.toml -r . -f txt
 
-      - name: Run Safety dependency vulnerability scanner
+      - name: Run pip-audit vulnerability scanner
         run: |
-          uv run safety check --json --output safety-report.json || true
-          uv run safety check
+          # CVE-2026-4539: ReDoS in pygments AdlLexer (pygments 2.19.x)
+          # No fix version available yet. Risk is minimal: pygments is an indirect
+          # dev dependency (via rich/bandit/basedpyright) and AdlLexer is never
+          # invoked in this project. Remove once a patched pygments is released.
+          #
+          # CVE-2026-3219: Vulnerability in pip itself (runner-installed toolchain).
+          # pip is not a direct project dependency; we do not control the runner's pip
+          # version. No fix version is available yet. Remove once pip is patched.
+          uv run --with pip-audit==2.10.0 pip-audit --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219
 
       - name: Upload security reports to SARIF
         if: always()
@@ -131,7 +138,6 @@ jobs:
           name: security-reports-${{ matrix.python-version }}
           path: |
             bandit-report.json
-            safety-report.json
             bandit.sarif
 
       - name: Comment PR with security results
@@ -160,19 +166,7 @@ jobs:
               comment += '### 🛡️ Bandit Security Linter\n❓ Report not available\n\n';
             }
 
-            try {
-              const safetyReport = JSON.parse(fs.readFileSync('safety-report.json', 'utf8'));
-              const vulnCount = safetyReport.vulnerabilities?.length || 0;
-              comment += `### 🔍 Safety Dependency Scanner\n`;
-              comment += `- **Vulnerabilities found**: ${vulnCount} ${vulnCount > 0 ? '❌' : '✅'}\n\n`;
-
-              if (vulnCount > 0) {
-                comment += `⚠️ **Action Required**: Please update vulnerable dependencies before merging.\n\n`;
-              }
-            } catch (e) {
-              comment += '### 🔍 Safety Dependency Scanner\n❓ Report not available\n\n';
-            }
-
+            comment += `> 💡 Dependency vulnerability scanning is handled by **pip-audit** in the quality checks workflow.\n\n`;
             comment += `---\n*Security scan completed for Python ${{ matrix.python-version }}*`;
 
             github.rest.issues.createComment({
