@@ -83,6 +83,7 @@ ignore = [
     "FBT003",  # Boolean positional value in call (needed for GTK/GIMP APIs)
     "TC003",   # Move stdlib import into TYPE_CHECKING (false positive for Path)
     "PLR0913", # Too many arguments (GIMP API signatures require this)
+    "PLR0917", # Too many positional arguments (GIMP API signatures require this)
     "BLE001",  # Blind exception catch (needed for robust error handling)
     "DTZ011",  # datetime.date.today() (acceptable for file naming)
     "TRY300",  # Consider moving to else block (doesn't improve clarity)
