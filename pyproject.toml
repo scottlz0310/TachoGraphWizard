@@ -126,6 +126,11 @@ exclude = [
     "venv",
 ]
 
+[tool.ruff.format]
+# ruff 0.16.0 以降は Markdown 内の Python コードブロックも整形対象になるが、
+# docs 配下は擬似コード断片を含む記録文書のため対象外とする
+exclude = ["*.md"]
+
 [tool.pytest.ini_options]
 addopts = "-p pytest_cov --cov=src --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
