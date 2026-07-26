@@ -3,6 +3,9 @@
 このドキュメントは現行仕様の要約と変更履歴を記載します。
 
 ## [Unreleased]
+### 修正
+- **ruff 0.16.0対応**: Markdown内Pythonコードブロックが整形対象になったことによるCI失敗を修正（`[tool.ruff.format]`で`*.md`を除外）
+
 ### 変更
 - **pre-commitのCI同等化**: `ruff format --check` / `ruff check` / `basedpyright` / `pytest` / `bandit` をpre-commitで実行するよう更新
 - **Threshold Bias初期値の見直し**: Chart WizardのSplit Imagesでしきい値スライダー初期値を15に変更し、UI表記を実際のデフォルト挙動に合わせて明確化
